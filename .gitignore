@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+*.blend1
+__pycache__/
+*.pyc
+.env
