@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Courtyard Designer — Apartment</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app/styles/main.css">
+</head>
+<body>
+
+  <!-- Top toolbar -->
+  <header id="toolbar">
+    <div class="logo">Courtyard Designer</div>
+    <span class="divider"></span>
+    <div class="view-group">
+      <button class="view-btn active" data-view="orbit">Orbit</button>
+      <button class="view-btn" data-view="walk">Walk</button>
+      <button class="view-btn" data-view="top">Top</button>
+    </div>
+    <span class="divider"></span>
+    <span class="toolbar-info" id="pos-info"></span>
+    <span class="toolbar-info" id="room-info"></span>
+    <div class="toolbar-right">
+      <button class="tool-btn" id="btn-save" title="Save">💾</button>
+      <button class="tool-btn" id="btn-undo" title="Undo last placement">↩</button>
+      <button class="tool-btn" id="btn-reset" title="Reset all">🗑</button>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" data-tab="furniture">Furniture</button>
+      <button class="tab-btn" data-tab="materials">Materials</button>
+      <button class="tab-btn" data-tab="rooms">Rooms</button>
+    </div>
+
+    <!-- Furniture tab -->
+    <div class="tab-content active" id="tab-furniture">
+      <div class="category-bar" id="category-bar"></div>
+      <div class="furniture-grid" id="furniture-grid"></div>
+    </div>
+
+    <!-- Materials tab -->
+    <div class="tab-content" id="tab-materials">
+      <div id="material-panel"></div>
+    </div>
+
+    <!-- Rooms tab -->
+    <div class="tab-content" id="tab-rooms">
+      <div id="room-list"></div>
+    </div>
+  </aside>
+
+  <!-- 3D Viewport -->
+  <canvas id="viewport"></canvas>
+
+  <!-- Minimap -->
+  <canvas id="minimap" width="200" height="200"></canvas>
+
+  <!-- Crosshair for walk mode -->
+  <div id="crosshair"></div>
+
+  <!-- Toast notifications -->
+  <div id="toast-container"></div>
+
+  <!-- Selection info bar -->
+  <div id="selection-bar"></div>
+
+  <!-- Controls hint -->
+  <div id="controls-hint">
+    <span><kbd>WASD</kbd> Move</span>
+    <span><kbd>Mouse</kbd> Look</span>
+    <span><kbd>Click</kbd> Place</span>
+    <span><kbd>R</kbd> Rotate</span>
+    <span><kbd>Del</kbd> Delete</span>
+    <span><kbd>Tab</kbd> Panel</span>
+    <span><kbd>Esc</kbd> Cancel</span>
+  </div>
+
+  <script type="module" src="/app/main.js"></script>
+</body>
+</html>
