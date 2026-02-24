@@ -378,6 +378,37 @@ body {
   box-shadow: 0 0 10px rgba(200, 169, 110, 0.5);
 }
 
+.swatch[title]:hover {
+  position: relative;
+}
+
+.swatch[title] {
+  position: relative;
+}
+
+.swatch[title]::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.swatch[title]:hover::after {
+  opacity: 1;
+}
+
 /* ================================================================
    SUN SLIDER
    ================================================================ */
@@ -674,6 +705,104 @@ body {
   box-shadow:
     0 0 20px rgba(200, 169, 110, 0.12),
     0 0 60px rgba(200, 169, 110, 0.06);
+}
+
+/* ================================================================
+   LOGIN OVERLAY
+   ================================================================ */
+#login-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#login-overlay.hidden {
+  display: none;
+}
+
+.login-box {
+  text-align: center;
+  padding: 48px 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.4);
+  min-width: 320px;
+}
+
+.login-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  text-shadow: 0 0 24px rgba(200, 169, 110, 0.2);
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 28px;
+}
+
+#login-form {
+  display: flex;
+  gap: 8px;
+}
+
+#login-input {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.25s var(--ease-out-expo);
+}
+
+#login-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(200, 169, 110, 0.1);
+}
+
+#login-input::placeholder {
+  color: var(--text-dim);
+}
+
+.login-btn {
+  padding: 10px 24px;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out-expo);
+}
+
+.login-btn:hover {
+  background: rgba(200, 169, 110, 0.25);
+  box-shadow: 0 0 16px rgba(200, 169, 110, 0.15);
+}
+
+/* ── Toolbar user display ── */
+.toolbar-user {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
 }
 
 /* ================================================================

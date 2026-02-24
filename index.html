@@ -29,6 +29,9 @@
       <button class="tool-btn" id="btn-save" title="Save">💾</button>
       <button class="tool-btn" id="btn-undo" title="Undo last placement">↩</button>
       <button class="tool-btn" id="btn-reset" title="Reset all">🗑</button>
+      <span class="divider"></span>
+      <span class="toolbar-user" id="toolbar-user"></span>
+      <button class="tool-btn" id="btn-signout" title="Sign out" style="display:none">Sign out</button>
     </div>
   </header>
 
@@ -79,6 +82,18 @@
 
   <!-- Selection info bar -->
   <div id="selection-bar"></div>
+
+  <!-- Login overlay -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <div class="login-title">Courtyard Designer</div>
+      <div class="login-subtitle">Enter your name to continue</div>
+      <form id="login-form">
+        <input type="text" id="login-input" placeholder="Your name" autocomplete="off" spellcheck="false" maxlength="32" required>
+        <button type="submit" class="login-btn">Enter</button>
+      </form>
+    </div>
+  </div>
 
   <!-- Controls hint -->
   <div id="controls-hint">

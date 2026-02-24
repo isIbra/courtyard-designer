@@ -31,7 +31,7 @@ function createDesertSkyTexture() {
 
 /* ── Subtle environment cubemap for glass reflections ── */
 function createWarmEnvMap() {
-  const size = 64;
+  const size = 128;
   const cubeRT = new THREE.WebGLCubeRenderTarget(size);
   const cubeScene = new THREE.Scene();
 
@@ -85,18 +85,18 @@ export function initPostProcessing() {
 
   // SSAO for ambient occlusion — adds depth to corners and crevices
   const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-  ssaoPass.kernelRadius = 0.8;
-  ssaoPass.minDistance = 0.001;
-  ssaoPass.maxDistance = 0.15;
+  ssaoPass.kernelRadius = 0.5;
+  ssaoPass.minDistance = 0.0005;
+  ssaoPass.maxDistance = 0.08;
   ssaoPass.output = SSAOPass.OUTPUT.Default;
   composer.addPass(ssaoPass);
 
   // Subtle bloom for lights and emissive materials
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.15,  // strength — very subtle
-    0.6,   // radius
-    0.85   // threshold — only bright things bloom
+    0.12,  // strength — very subtle
+    0.4,   // radius
+    0.9    // threshold — only lamps bloom
   );
   composer.addPass(bloomPass);
 
@@ -147,7 +147,7 @@ export function initLights() {
   sunLight.shadow.camera.far = 55;
   sunLight.shadow.bias = -0.0005;
   sunLight.shadow.normalBias = 0.02;
-  sunLight.shadow.radius = 1.5; // slight softening
+  sunLight.shadow.radius = 2.0; // softer penumbra
   scene.add(sunLight);
 
   // Fill light from below — simulates light bouncing off sand/concrete

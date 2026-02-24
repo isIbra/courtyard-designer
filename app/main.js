@@ -1,12 +1,63 @@
 import * as THREE from 'three';
 import { scene, renderer, camera, initLights, updateSun, resize, composer, initPostProcessing } from './modules/scene.js';
-import { setCeilingsVisible } from './modules/apartment.js';
+import { setCeilingsVisible, buildRoomFloors, applyFloorTexture } from './modules/apartment.js';
 import { initOrbit, updateControls, onWalkMouseMove, onKeyDown, onKeyUp, viewMode } from './modules/controls.js';
-import { initPersistence } from './modules/persistence.js';
+import { initPersistence, loadFloorMaterials, loadFromServer, setUsername, syncToServer } from './modules/persistence.js';
 import { initUI, toast } from './modules/ui.js';
 import { drawMinimap } from './modules/minimap.js';
+
+const USERNAME_KEY = 'courtyard-designer-username';
+
+// ── Login flow ──
+function showLogin() {
+  const overlay = document.getElementById('login-overlay');
+  const form = document.getElementById('login-form');
+  const input = document.getElementById('login-input');
+
+  overlay.classList.remove('hidden');
+  input.focus();
+
+  return new Promise((resolve) => {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = input.value.trim();
+      if (!name) return;
+      localStorage.setItem(USERNAME_KEY, name);
+      overlay.classList.add('hidden');
+      resolve(name);
+    }, { once: true });
+  });
+}
+
+function setupSignout() {
+  const btn = document.getElementById('btn-signout');
+  const userEl = document.getElementById('toolbar-user');
+  const username = localStorage.getItem(USERNAME_KEY);
+
+  if (username) {
+    userEl.textContent = username;
+    btn.style.display = '';
+  }
+
+  btn.addEventListener('click', () => {
+    localStorage.removeItem(USERNAME_KEY);
+    location.reload();
+  });
+}
+
 // ── Init ──
 async function init() {
+  // Check for existing username or show login
+  let username = localStorage.getItem(USERNAME_KEY);
+  if (!username) {
+    username = await showLogin();
+  } else {
+    document.getElementById('login-overlay').classList.add('hidden');
+  }
+
+  setUsername(username);
+  setupSignout();
+
   resize();
   initLights();
   initPostProcessing();
@@ -17,9 +68,26 @@ async function init() {
   // Start in orbit — hide ceilings
   setCeilingsVisible(false);
 
-  // Load walls + furniture from IndexedDB (seeds on first run)
+  // Try loading from server first
+  const serverLoaded = await loadFromServer(username);
+
+  // Load walls + furniture from IndexedDB (seeds on first run, or uses server data just written)
   const result = await initPersistence();
   toast(`Loaded ${result.wallCount} walls`);
+
+  // Build room floors + ceilings (after walls so rooms overlay correctly)
+  buildRoomFloors();
+
+  // Restore saved floor materials
+  const savedFloors = await loadFloorMaterials();
+  for (const [roomId, texType] of Object.entries(savedFloors)) {
+    applyFloorTexture(roomId, texType);
+  }
+
+  // If this is a brand new user (no server data), sync seed state up
+  if (!serverLoaded) {
+    syncToServer(username);
+  }
 
   // Walk mode mouse
   document.addEventListener('mousemove', (e) => {

@@ -1,10 +1,11 @@
 import { CATALOG, createMesh, placeItem, removeItem, placed } from './furniture.js';
 import { ROOMS } from './apartment.js';
 import { setViewMode, viewMode, requestPointerLock, onTopZoom } from './controls.js';
-import { saveState, resetState, autoSave } from './persistence.js';
+import { saveState, resetState, autoSave, saveFloorMaterial } from './persistence.js';
 import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
 import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall } from './wall-builder.js';
+import { createProceduralTexture, TEXTURE_TYPES, TEXTURE_NAMES, TEXTURE_SWATCH_COLORS } from './textures.js';
 import * as THREE from 'three';
 
 // ── State ──
@@ -75,7 +76,7 @@ function buildCategoryBar() {
 // ── Room list ──
 function buildRoomList() {
   const list = document.getElementById('room-list');
-  const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard', x: 9.10, z: 0, w: 6.91, d: 11.20 }];
+  const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard', x: 30.15, z: 2.49, w: 16.97, d: 28.64 }];
 
   for (const room of allRooms) {
     const div = document.createElement('div');
@@ -95,19 +96,19 @@ function buildRoomList() {
   }
 }
 
-// ── Material panel ──
+// ── Material panel with texture swatches ──
 function buildMaterialPanel() {
   const panel = document.getElementById('material-panel');
   const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard' }];
 
-  const floorColors = ['#a69882', '#8B7355', '#D2C4A8', '#556B2F', '#4a4a4a', '#C19A6B', '#d0d0d5'];
+  // Floor-appropriate texture types (no plaster for floors)
+  const floorTextures = TEXTURE_TYPES.filter(t => t !== 'plaster');
 
   for (const room of allRooms) {
     const section = document.createElement('div');
     section.className = 'mat-section';
     section.innerHTML = `<div class="mat-section-title">${room.name}</div>`;
 
-    // Floor colors
     const floorLabel = document.createElement('div');
     floorLabel.className = 'mat-label';
     floorLabel.textContent = 'Floor';
@@ -115,20 +116,60 @@ function buildMaterialPanel() {
 
     const floorRow = document.createElement('div');
     floorRow.className = 'swatch-row';
-    for (const color of floorColors) {
+    for (const texType of floorTextures) {
       const swatch = document.createElement('div');
       swatch.className = 'swatch';
-      swatch.style.background = color;
+      swatch.style.background = TEXTURE_SWATCH_COLORS[texType] || '#888';
+      swatch.title = TEXTURE_NAMES[texType] || texType;
       swatch.addEventListener('click', () => {
         const floorMesh = scene.getObjectByName(`floor_${room.id}`) ||
                           scene.getObjectByName('courtyard_floor');
-        if (floorMesh) floorMesh.material.color.setStyle(color);
+        if (!floorMesh) return;
+
+        const tex = createProceduralTexture(texType);
+        const mat = floorMesh.material;
+
+        // Calculate repeat from mesh geometry
+        let repeatX = 2, repeatZ = 2;
+        if (room.id === 'courtyard') {
+          // Courtyard L-shape: UVs normalized to 0..1, tile scaled to ~17x29 unit area
+          repeatX = 6;
+          repeatZ = 10;
+        } else if (floorMesh.geometry.parameters) {
+          repeatX = (floorMesh.geometry.parameters.width || 4) / 2;
+          repeatZ = (floorMesh.geometry.parameters.height || 4) / 2;
+        }
+
+        const newMap = tex.map.clone();
+        newMap.repeat.set(repeatX, repeatZ);
+        newMap.wrapS = THREE.RepeatWrapping;
+        newMap.wrapT = THREE.RepeatWrapping;
+        newMap.needsUpdate = true;
+
+        const newNormal = tex.normalMap.clone();
+        newNormal.repeat.set(repeatX, repeatZ);
+        newNormal.wrapS = THREE.RepeatWrapping;
+        newNormal.wrapT = THREE.RepeatWrapping;
+        newNormal.needsUpdate = true;
+
+        mat.map = newMap;
+        mat.normalMap = newNormal;
+        mat.normalScale.set(0.3, 0.3);
+        mat.roughness = tex.roughness;
+        mat.color.setHex(0xffffff);
+        mat.needsUpdate = true;
+
+        // Mark active swatch
+        floorRow.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+
+        // Persist floor material choice
+        saveFloorMaterial(room.id, texType);
         autoSave();
       });
       floorRow.appendChild(swatch);
     }
     section.appendChild(floorRow);
-
     panel.appendChild(section);
   }
 }

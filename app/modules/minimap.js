@@ -13,15 +13,19 @@ const MAX_X = 50;
 const MAX_Z = 34;
 
 const ROOM_COLORS = {
-  closet:    '#4a4540',
-  staircase: '#4a4a5a',
-  bedroom:   '#5a5040',
-  bathroom:  '#404855',
-  storage:   '#3a3a3a',
-  living:    '#504a38',
-  kitchen:   '#484840',
-  guestroom: '#4a4540',
-  guestbath: '#404855',
+  closet:       '#4a4540',
+  staircase:    '#4a4a5a',
+  bedroom:      '#5a5040',
+  bathroom:     '#404855',
+  storage:      '#3a3a3a',
+  living:       '#504a38',
+  living_south: '#504a38',
+  kitchen:      '#484840',
+  guestroom:    '#4a4540',
+  guestbath:    '#404855',
+  room2:        '#4a4a40',
+  room3:        '#484545',
+  room4:        '#504840',
 };
 
 function toCanvas(x, z) {

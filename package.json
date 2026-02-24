@@ -2,6 +2,7 @@
   "name": "courtyard-designer-repo---3d-apartment-design",
   "version": "1.0.0",
   "description": "Interactive 3D courtyard & apartment designer built with Three.js and Blender.",
+  "type": "module",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -9,7 +10,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node server/index.js",
+    "start": "npm run build && node server/index.js"
   },
   "repository": {
     "type": "git",
@@ -23,6 +26,9 @@
   },
   "homepage": "https://github.com/isIbra/courtyard-designer#readme",
   "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "three": "^0.182.0",
     "vite": "^7.3.1"
   }

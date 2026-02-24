@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
 import { wallMeshes } from './apartment.js';
+import { createProceduralTexture } from './textures.js';
 
 const T = 0.25;
 const EAST_H = 7.0;
@@ -27,7 +28,24 @@ function slopeH(cx) {
 }
 
 // ── Materials ──
-const wallMat = new THREE.MeshStandardMaterial({ color: 0xEBE0D0, roughness: 0.85 });
+const plasterTex = createProceduralTexture('plaster');
+const cwMap = plasterTex.map.clone();
+cwMap.repeat.set(3, 3);
+cwMap.wrapS = THREE.RepeatWrapping;
+cwMap.wrapT = THREE.RepeatWrapping;
+cwMap.needsUpdate = true;
+const cwNormal = plasterTex.normalMap.clone();
+cwNormal.repeat.set(3, 3);
+cwNormal.wrapS = THREE.RepeatWrapping;
+cwNormal.wrapT = THREE.RepeatWrapping;
+cwNormal.needsUpdate = true;
+const wallMat = new THREE.MeshStandardMaterial({
+  color: 0xEBE0D0,
+  map: cwMap,
+  normalMap: cwNormal,
+  normalScale: new THREE.Vector2(0.15, 0.15),
+  roughness: 0.88,
+});
 const glassMat = new THREE.MeshStandardMaterial({
   color: 0xBBDDFF, roughness: 0.0,
   metalness: 0.1,
@@ -55,7 +73,35 @@ function buildFloor() {
   shape.closePath();
 
   const geo = new THREE.ShapeGeometry(shape);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xa69882, roughness: 0.7 });
+
+  // Normalize UVs: ShapeGeometry produces world-space UVs — remap to 0..1
+  const uv = geo.attributes.uv;
+  // Courtyard spans roughly OX..OX+6.91 in X and OZ_FLIP-11.20..OZ_FLIP in Z
+  const uMin = OX, uMax = OX + 6.91;
+  const vMin = OZ_FLIP - 11.20, vMax = OZ_FLIP;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setX(i, (uv.getX(i) - uMin) / (uMax - uMin));
+    uv.setY(i, (uv.getY(i) - vMin) / (vMax - vMin));
+  }
+  uv.needsUpdate = true;
+
+  const stoneTex = createProceduralTexture('stone_travertine');
+  const floorMap = stoneTex.map.clone();
+  floorMap.repeat.set(3, 4);
+  floorMap.wrapS = THREE.RepeatWrapping;
+  floorMap.wrapT = THREE.RepeatWrapping;
+  floorMap.needsUpdate = true;
+  const floorNormal = stoneTex.normalMap.clone();
+  floorNormal.repeat.set(3, 4);
+  floorNormal.wrapS = THREE.RepeatWrapping;
+  floorNormal.wrapT = THREE.RepeatWrapping;
+  floorNormal.needsUpdate = true;
+  const mat = new THREE.MeshStandardMaterial({
+    map: floorMap,
+    normalMap: floorNormal,
+    normalScale: new THREE.Vector2(0.3, 0.3),
+    roughness: stoneTex.roughness,
+  });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.01;
