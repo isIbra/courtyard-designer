@@ -70,7 +70,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 0.75;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 /* ── Post-processing ── */
@@ -125,17 +125,16 @@ export function initLights() {
   // Set environment map for reflections on glass/metal
   scene.environment = createWarmEnvMap();
 
-  // Warm ambient — the golden undertone that saturates everything in Riyadh
-  const ambient = new THREE.AmbientLight(0xffd9a0, 0.35);
+  // Warm ambient — subtle golden undertone
+  const ambient = new THREE.AmbientLight(0xffd9a0, 0.2);
   scene.add(ambient);
 
   // Hemisphere: warm sky dome + sandy ground bounce
-  // Sky color is a muted warm blue, ground is sun-baked sand
-  const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.55);
+  const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.3);
   scene.add(hemi);
 
-  // Primary sun — warm white with golden bias
-  sunLight = new THREE.DirectionalLight(0xfff0d0, 1.6);
+  // Primary sun — warm white, moderate intensity
+  sunLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
   sunLight.position.set(8, 18, 5);
   sunLight.castShadow = true;
   // 4096 shadow map for crisp, detailed shadows
@@ -152,15 +151,14 @@ export function initLights() {
   scene.add(sunLight);
 
   // Fill light from below — simulates light bouncing off sand/concrete
-  // Subtle warm uplight that lifts the underside of overhangs and furniture
-  const fillBelow = new THREE.DirectionalLight(0xffe0b0, 0.4);
+  const fillBelow = new THREE.DirectionalLight(0xffe0b0, 0.15);
   fillBelow.position.set(0, -3, 0);
   fillBelow.target.position.set(0, 5, 0);
   scene.add(fillBelow);
   scene.add(fillBelow.target);
 
   // Secondary rim/back light — faint cool fill for depth contrast
-  const rimLight = new THREE.DirectionalLight(0xc0d0e8, 0.25);
+  const rimLight = new THREE.DirectionalLight(0xc0d0e8, 0.15);
   rimLight.position.set(-10, 10, -8);
   scene.add(rimLight);
 
@@ -194,7 +192,7 @@ export function updateSun(t01) {
   );
 
   // Intensity peaks at solar noon, drops at edges
-  sunLight.intensity = 0.8 + sinA * 1.0;
+  sunLight.intensity = 0.6 + sinA * 0.5;
 
   // Sky color shifts: golden-hour warmth at extremes, pale warm blue at noon
   // Red channel stays high (warm), green follows sun, blue is always subdued

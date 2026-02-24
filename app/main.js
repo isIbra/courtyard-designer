@@ -1,21 +1,15 @@
 import * as THREE from 'three';
 import { scene, renderer, camera, initLights, updateSun, resize, composer, initPostProcessing } from './modules/scene.js';
-import { buildApartment, setCeilingsVisible } from './modules/apartment.js';
-// import { buildCourtyard } from './modules/courtyard.js';
+import { setCeilingsVisible } from './modules/apartment.js';
 import { initOrbit, updateControls, onWalkMouseMove, onKeyDown, onKeyUp, viewMode } from './modules/controls.js';
-import { loadState } from './modules/persistence.js';
+import { initPersistence } from './modules/persistence.js';
 import { initUI, toast } from './modules/ui.js';
 import { drawMinimap } from './modules/minimap.js';
-import { buildReference } from './modules/reference.js';
-
 // ── Init ──
-function init() {
+async function init() {
   resize();
   initLights();
   initPostProcessing();
-  buildApartment();
-  // buildCourtyard(); // disabled — walls built by new buildApartment
-  buildReference();
   initOrbit();
   initUI();
   updateSun(0.65);
@@ -23,9 +17,9 @@ function init() {
   // Start in orbit — hide ceilings
   setCeilingsVisible(false);
 
-  // Load saved state
-  const loaded = loadState();
-  if (loaded) toast('Restored saved state');
+  // Load walls + furniture from IndexedDB (seeds on first run)
+  const result = await initPersistence();
+  toast(`Loaded ${result.wallCount} walls`);
 
   // Walk mode mouse
   document.addEventListener('mousemove', (e) => {
@@ -55,5 +49,4 @@ function animate() {
   drawMinimap();
 }
 
-init();
-animate();
+init().then(() => animate());

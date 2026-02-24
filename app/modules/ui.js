@@ -1,9 +1,10 @@
 import { CATALOG, createMesh, placeItem, removeItem, placed } from './furniture.js';
 import { ROOMS } from './apartment.js';
 import { setViewMode, viewMode, requestPointerLock, onTopZoom } from './controls.js';
-import { saveState, loadState, resetState, autoSave } from './persistence.js';
+import { saveState, resetState, autoSave } from './persistence.js';
 import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
+import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall } from './wall-builder.js';
 import * as THREE from 'three';
 
 // ── State ──
@@ -100,7 +101,6 @@ function buildMaterialPanel() {
   const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard' }];
 
   const floorColors = ['#a69882', '#8B7355', '#D2C4A8', '#556B2F', '#4a4a4a', '#C19A6B', '#d0d0d5'];
-  const wallColors = ['#EBE0D0', '#D4C5A9', '#F5F0E8', '#B8A88A', '#8B8178', '#FFFFFF', '#E5E0E0'];
 
   for (const room of allRooms) {
     const section = document.createElement('div');
@@ -135,6 +135,9 @@ function buildMaterialPanel() {
 
 // ── Select furniture type ──
 function selectFurniture(id) {
+  // Exit wall build mode if active
+  if (isBuildMode()) toggleWallBuildMode();
+
   if (selectedType === id) {
     // Deselect
     selectedType = null;
@@ -157,6 +160,7 @@ function deselectAll() {
   selectedType = null;
   selectedObj = null;
   if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
+  deselectWall();
   document.getElementById('selection-bar').style.display = 'none';
   buildFurnitureGrid();
 }
@@ -208,6 +212,21 @@ export function initUI() {
     });
   }
 
+  // Wall tool button
+  const wallBtn = document.getElementById('btn-wall');
+  if (wallBtn) {
+    wallBtn.addEventListener('click', () => {
+      const on = toggleWallBuildMode();
+      if (on) {
+        // Deselect furniture when entering wall mode
+        selectedType = null;
+        if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
+        buildFurnitureGrid();
+      }
+      toast(on ? 'Wall tool ON' : 'Wall tool OFF');
+    });
+  }
+
   // Save / Reset
   document.getElementById('btn-save').addEventListener('click', () => {
     saveState();
@@ -223,7 +242,7 @@ export function initUI() {
   });
 
   document.getElementById('btn-reset').addEventListener('click', () => {
-    if (confirm('Reset all furniture?')) {
+    if (confirm('Reset all walls and furniture?')) {
       resetState();
       toast('Reset complete');
     }
@@ -235,9 +254,16 @@ export function initUI() {
   vp.addEventListener('click', (e) => {
     if (viewMode === 'walk') {
       requestPointerLock();
+      return;
     }
 
-    // Place furniture
+    // Wall build mode takes priority
+    if (isBuildMode()) {
+      onWallClick(e);
+      return;
+    }
+
+    // Furniture placement
     if (selectedType) {
       const pt = getFloorHit(e);
       if (pt) {
@@ -249,7 +275,10 @@ export function initUI() {
       return;
     }
 
-    // Select placed object
+    // Wall selection (try first, before furniture)
+    if (onWallSelect(e)) return;
+
+    // Select placed furniture object
     const rect = vp.getBoundingClientRect();
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -287,11 +316,13 @@ export function initUI() {
   });
 
   vp.addEventListener('mousemove', (e) => {
-    // Ghost preview
+    // Wall builder ghost preview
+    onWallMouseMove(e);
+
+    // Furniture ghost preview
     if (ghostMesh && selectedType) {
       const pt = getFloorHit(e);
       if (pt) {
-        // Snap to 0.25m grid
         ghostMesh.position.x = Math.round(pt.x / 0.25) * 0.25;
         ghostMesh.position.z = Math.round(pt.z / 0.25) * 0.25;
         ghostMesh.visible = true;
@@ -317,9 +348,23 @@ export function initUI() {
       const vp = document.getElementById('viewport');
       sidebar.classList.toggle('hidden');
       vp.classList.toggle('fullwidth');
-      // Trigger resize
       setTimeout(() => window.dispatchEvent(new Event('resize')), 350);
     }
+
+    // W toggles wall mode (only when not in walk mode)
+    if ((e.key === 'w' || e.key === 'W') && viewMode !== 'walk') {
+      const on = toggleWallBuildMode();
+      if (on) {
+        selectedType = null;
+        if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
+        buildFurnitureGrid();
+      }
+      toast(on ? 'Wall tool ON' : 'Wall tool OFF');
+      return;
+    }
+
+    // Wall builder key handlers (Escape, Delete)
+    if (onWallKeyDown(e.key)) return;
 
     if (e.key === 'Escape') deselectAll();
 

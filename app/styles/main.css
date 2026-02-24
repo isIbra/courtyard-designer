@@ -130,6 +130,13 @@ body {
   font-size: 14px;
 }
 
+.tool-btn.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-dim);
+  box-shadow: 0 0 12px rgba(200, 169, 110, 0.08);
+}
+
 .toolbar-info {
   font-family: var(--font-mono);
   font-size: 11px;

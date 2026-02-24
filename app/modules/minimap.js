@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ROOMS } from './apartment.js';
 import { placed } from './furniture.js';
 import { camera } from './scene.js';
+import { wallRecords } from './wall-builder.js';
 
 const canvas = document.getElementById('minimap');
 const ctx = canvas.getContext('2d');
@@ -53,7 +54,7 @@ export function drawMinimap() {
     ctx.fillText(room.name, (px + px2) / 2, (pz + pz2) / 2 + 3);
   }
 
-  // Courtyard L-shape (matches courtyard.js P points, converted to building coords)
+  // Courtyard L-shape
   const OX = 9.10;
   const OZ_FLIP = 11.20;
   const courtyardPts = [
@@ -77,6 +78,27 @@ export function drawMinimap() {
   ctx.textAlign = 'center';
   const [clx, clz] = toCanvas(OX + 3.0, OZ_FLIP - 5.6);
   ctx.fillText('Courtyard', clx, clz + 3);
+
+  // Wall lines from live wall records
+  ctx.strokeStyle = 'rgba(200, 169, 110, 0.7)';
+  ctx.lineWidth = 1;
+  for (const rec of wallRecords.values()) {
+    if (rec.type === 'h') {
+      const [px1, pz] = toCanvas(rec.x1, rec.z);
+      const [px2] = toCanvas(rec.x2, rec.z);
+      ctx.beginPath();
+      ctx.moveTo(px1, pz);
+      ctx.lineTo(px2, pz);
+      ctx.stroke();
+    } else {
+      const [px, pz1] = toCanvas(rec.x, rec.z1);
+      const [, pz2] = toCanvas(rec.x, rec.z2);
+      ctx.beginPath();
+      ctx.moveTo(px, pz1);
+      ctx.lineTo(px, pz2);
+      ctx.stroke();
+    }
+  }
 
   // Furniture dots
   for (const item of placed) {
