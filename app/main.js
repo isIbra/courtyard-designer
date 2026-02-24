@@ -3,8 +3,9 @@ import { scene, renderer, camera, initLights, updateSun, resize, composer, initP
 import { setCeilingsVisible, buildRoomFloors, applyFloorTexture } from './modules/apartment.js';
 import { initOrbit, updateControls, onWalkMouseMove, onKeyDown, onKeyUp, viewMode } from './modules/controls.js';
 import { initPersistence, loadFloorMaterials, loadFromServer, setUsername, syncToServer } from './modules/persistence.js';
-import { initUI, toast } from './modules/ui.js';
+import { initUI, toast, refreshFurnitureGrid } from './modules/ui.js';
 import { drawMinimap } from './modules/minimap.js';
+import { preloadModels, generateThumbnails } from './modules/furniture.js';
 
 const USERNAME_KEY = 'courtyard-designer-username';
 
@@ -64,6 +65,8 @@ async function init() {
   initOrbit();
   initUI();
   updateSun(0.65);
+  preloadModels();
+  generateThumbnails().then(() => refreshFurnitureGrid());
 
   // Start in orbit — hide ceilings
   setCeilingsVisible(false);
@@ -71,11 +74,11 @@ async function init() {
   // Try loading from server first
   const serverLoaded = await loadFromServer(username);
 
-  // Load walls + furniture from IndexedDB (seeds on first run, or uses server data just written)
+  // Load walls + furniture + floor tiles + stairs from IndexedDB
   const result = await initPersistence();
-  toast(`Loaded ${result.wallCount} walls`);
+  toast(`Loaded ${result.wallCount} walls, ${result.floorTileCount} floors`);
 
-  // Build room floors + ceilings (after walls so rooms overlay correctly)
+  // Build courtyard floor (always present)
   buildRoomFloors();
 
   // Restore saved floor materials

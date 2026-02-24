@@ -1,7 +1,7 @@
 // ── IndexedDB wrapper for courtyard-designer ──
 
 const DB_NAME = 'courtyard-designer';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -19,6 +19,13 @@ export function openDB() {
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' });
+      }
+      // v2: floor tiles + stairs
+      if (!db.objectStoreNames.contains('floorTiles')) {
+        db.createObjectStore('floorTiles', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('stairs')) {
+        db.createObjectStore('stairs', { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -96,4 +103,62 @@ export async function getMeta(key) {
 
 export async function putMeta(key, value) {
   return wrap((await store('meta', 'readwrite')).put({ key, value }));
+}
+
+// ── Floor Tiles ──
+
+export async function getAllFloorTiles() {
+  return wrap((await store('floorTiles')).getAll());
+}
+
+export async function putFloorTile(tile) {
+  return wrap((await store('floorTiles', 'readwrite')).put(tile));
+}
+
+export async function deleteFloorTile(id) {
+  return wrap((await store('floorTiles', 'readwrite')).delete(id));
+}
+
+export async function putAllFloorTiles(tiles) {
+  const db = await openDB();
+  const txn = db.transaction('floorTiles', 'readwrite');
+  const s = txn.objectStore('floorTiles');
+  for (const t of tiles) s.put(t);
+  return new Promise((resolve, reject) => {
+    txn.oncomplete = resolve;
+    txn.onerror = () => reject(txn.error);
+  });
+}
+
+export async function clearFloorTiles() {
+  return wrap((await store('floorTiles', 'readwrite')).clear());
+}
+
+// ── Stairs ──
+
+export async function getAllStairs() {
+  return wrap((await store('stairs')).getAll());
+}
+
+export async function putStair(stair) {
+  return wrap((await store('stairs', 'readwrite')).put(stair));
+}
+
+export async function deleteStair(id) {
+  return wrap((await store('stairs', 'readwrite')).delete(id));
+}
+
+export async function putAllStairs(stairList) {
+  const db = await openDB();
+  const txn = db.transaction('stairs', 'readwrite');
+  const s = txn.objectStore('stairs');
+  for (const st of stairList) s.put(st);
+  return new Promise((resolve, reject) => {
+    txn.oncomplete = resolve;
+    txn.onerror = () => reject(txn.error);
+  });
+}
+
+export async function clearStairs() {
+  return wrap((await store('stairs', 'readwrite')).clear());
 }

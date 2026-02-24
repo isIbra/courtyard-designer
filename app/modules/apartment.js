@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
 import { createProceduralTexture } from './textures.js';
+import { FLOOR_HEIGHT } from './floor-manager.js';
 
 // ── Constants ──
 export const T = 0.35;
@@ -31,79 +32,21 @@ export function setCeilingsVisible(visible) {
   for (const mesh of ceilingMeshes) mesh.visible = visible;
 }
 
-// ── Build textured floors and ceilings for every room ──
-export function buildRoomFloors() {
-  const ceilingMat = new THREE.MeshStandardMaterial({
-    color: 0xF5F0E8,
-    roughness: 0.9,
-    metalness: 0.0,
-  });
-
-  for (const room of ROOMS) {
-    const y = room.yOffset || 0;
-
-    // Floor
-    const tex = createProceduralTexture(room.floorType);
-    const repeatX = room.w / 2;
-    const repeatZ = room.d / 2;
-    const floorMap = tex.map.clone();
-    floorMap.repeat.set(repeatX, repeatZ);
-    floorMap.wrapS = THREE.RepeatWrapping;
-    floorMap.wrapT = THREE.RepeatWrapping;
-    floorMap.needsUpdate = true;
-
-    const floorNormal = tex.normalMap.clone();
-    floorNormal.repeat.set(repeatX, repeatZ);
-    floorNormal.wrapS = THREE.RepeatWrapping;
-    floorNormal.wrapT = THREE.RepeatWrapping;
-    floorNormal.needsUpdate = true;
-
-    const floorMat = new THREE.MeshStandardMaterial({
-      map: floorMap,
-      normalMap: floorNormal,
-      normalScale: new THREE.Vector2(0.3, 0.3),
-      roughness: tex.roughness,
-      metalness: 0.0,
-    });
-
-    const floorGeo = new THREE.PlaneGeometry(room.w, room.d);
-    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.set(room.x + room.w / 2, y + 0.005, room.z + room.d / 2);
-    floorMesh.receiveShadow = true;
-    floorMesh.name = `floor_${room.id}`;
-    floorMesh.userData.roomId = room.id;
-    floorMesh.userData.isFloor = true;
-    scene.add(floorMesh);
-    floorMeshes.push(floorMesh);
-
-    // Ceiling
-    const ceilGeo = new THREE.PlaneGeometry(room.w, room.d);
-    const ceilMesh = new THREE.Mesh(ceilGeo, ceilingMat);
-    ceilMesh.rotation.x = Math.PI / 2;
-    ceilMesh.position.set(room.x + room.w / 2, H - 0.005, room.z + room.d / 2);
-    ceilMesh.name = `ceiling_${room.id}`;
-    scene.add(ceilMesh);
-    ceilingMeshes.push(ceilMesh);
-  }
-
-  // ── Courtyard L-shaped floor (wall-data.js coordinates) ──
-  // Shape uses (worldX, -worldZ) so that after rotation.x = -π/2 it maps to (X, 0, Z)
-  // Vertices in CCW order (viewed from +Z) so normals face +Z → +Y after rotation
+// ── Build courtyard L-shaped floor (always built, not a floor tile) ──
+export function buildCourtyardFloor() {
   const cyShape = new THREE.Shape();
-  cyShape.moveTo(31.83, -13.28);  // West jog
-  cyShape.lineTo(30.15, -13.28);  // West step
-  cyShape.lineTo(30.15, -31.13);  // SW
-  cyShape.lineTo(47.12, -31.13);  // SE
-  cyShape.lineTo(47.12, -23.17);  // East jog
-  cyShape.lineTo(44.13, -23.17);  // East step
-  cyShape.lineTo(44.13, -2.49);   // NE upper
-  cyShape.lineTo(31.83, -2.49);   // NW
+  cyShape.moveTo(31.83, -13.28);
+  cyShape.lineTo(30.15, -13.28);
+  cyShape.lineTo(30.15, -31.13);
+  cyShape.lineTo(47.12, -31.13);
+  cyShape.lineTo(47.12, -23.17);
+  cyShape.lineTo(44.13, -23.17);
+  cyShape.lineTo(44.13, -2.49);
+  cyShape.lineTo(31.83, -2.49);
   cyShape.closePath();
 
   const cyGeo = new THREE.ShapeGeometry(cyShape);
 
-  // Normalize UVs to 0..1 based on bounding box
   const cyUv = cyGeo.attributes.uv;
   const cxMin = 30.15, cxMax = 47.12;
   const cyMin = -31.13, cyMax = -2.49;
@@ -144,13 +87,60 @@ export function buildRoomFloors() {
   cyFloor.name = 'floor_courtyard';
   cyFloor.userData.roomId = 'courtyard';
   cyFloor.userData.isFloor = true;
+  cyFloor.userData.floor = 0;
   scene.add(cyFloor);
   floorMeshes.push(cyFloor);
 }
 
+/** Generate seed floor tile records from ROOMS array (for first-load migration) */
+export function generateSeedFloorTiles() {
+  return ROOMS.map((room) => ({
+    id: `ft_seed_${room.id}`,
+    x: room.x,
+    z: room.z,
+    w: room.w,
+    d: room.d,
+    floor: 0,
+    texType: room.floorType,
+    yOffset: room.yOffset || 0,
+    roomId: room.id,
+  }));
+}
+
+// ── Build ceilings for floor tiles (called after floor tiles are loaded) ──
+export function buildCeilings(floorTileRecords) {
+  const ceilingMat = new THREE.MeshStandardMaterial({
+    color: 0xF5F0E8,
+    roughness: 0.9,
+    metalness: 0.0,
+  });
+
+  for (const rec of floorTileRecords) {
+    const floorLevel = rec.floor || 0;
+    const yBase = floorLevel * FLOOR_HEIGHT;
+    const ceilGeo = new THREE.PlaneGeometry(rec.w, rec.d);
+    const ceilMesh = new THREE.Mesh(ceilGeo, ceilingMat.clone());
+    ceilMesh.rotation.x = Math.PI / 2;
+    ceilMesh.position.set(rec.x + rec.w / 2, yBase + H - 0.005, rec.z + rec.d / 2);
+    ceilMesh.name = `ceiling_${rec.id}`;
+    ceilMesh.userData.floor = floorLevel;
+    scene.add(ceilMesh);
+    ceilingMeshes.push(ceilMesh);
+  }
+}
+
+// Legacy — kept for backward compat, delegates to new system
+export function buildRoomFloors() {
+  buildCourtyardFloor();
+}
+
 /** Apply a saved texture to a room's floor mesh */
 export function applyFloorTexture(roomId, texType) {
-  const floorMesh = scene.getObjectByName(`floor_${roomId}`);
+  let floorMesh = scene.getObjectByName(`floor_${roomId}`);
+  if (!floorMesh) {
+    // Look for seed floor tile for this room
+    floorMesh = scene.getObjectByName(`floorTile_ft_seed_${roomId}`);
+  }
   if (!floorMesh) return;
 
   const tex = createProceduralTexture(texType);
@@ -221,24 +211,27 @@ const highlightMat = new THREE.MeshStandardMaterial({
 export function addWallFromRecord(rec) {
   const wallH = rec.H || H;
   const wallT = rec.T || T;
+  const floorLevel = rec.floor || 0;
+  const yBase = floorLevel * FLOOR_HEIGHT;
   let mesh;
 
   if (rec.type === 'h') {
     const w = rec.x2 - rec.x1;
     if (w < 0.05) return null;
     mesh = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, wallT), wallMat);
-    mesh.position.set(rec.x1 + w / 2, wallH / 2, rec.z);
+    mesh.position.set(rec.x1 + w / 2, wallH / 2 + yBase, rec.z);
   } else {
     const d = rec.z2 - rec.z1;
     if (d < 0.05) return null;
     mesh = new THREE.Mesh(new THREE.BoxGeometry(wallT, wallH, d), wallMat);
-    mesh.position.set(rec.x, wallH / 2, rec.z1 + d / 2);
+    mesh.position.set(rec.x, wallH / 2 + yBase, rec.z1 + d / 2);
   }
 
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.wallId = rec.id;
   mesh.userData.wallRecord = rec;
+  mesh.userData.floor = floorLevel;
   scene.add(mesh);
   wallMeshes.push(mesh);
   wallMeshMap.set(rec.id, mesh);

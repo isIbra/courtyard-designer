@@ -3,6 +3,8 @@ import { scene, camera, renderer } from './scene.js';
 import { addWallFromRecord, removeWallById, wallMeshes, highlightWall, unhighlightWall, H, T } from './apartment.js';
 import { putWall, deleteWall as dbDeleteWall } from './db.js';
 import { createWallRecord } from './wall-data.js';
+import { getCurrentFloor, getYBase } from './floor-manager.js';
+import { pushAction } from './history.js';
 
 // ── State ──
 let buildMode = false;
@@ -27,7 +29,8 @@ function getFloorHit(event) {
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const yBase = getYBase(getCurrentFloor());
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -yBase);
   const pt = new THREE.Vector3();
   raycaster.ray.intersectPlane(plane, pt);
   return pt;
@@ -51,20 +54,21 @@ function updateGhost(startPt, endPt) {
   const dz = Math.abs(endPt.z - startPt.z);
   if (dx < 0.1 && dz < 0.1) return;
 
+  const yBase = getYBase(getCurrentFloor());
   if (dx >= dz) {
     const x1 = Math.min(startPt.x, endPt.x);
     const x2 = Math.max(startPt.x, endPt.x);
     const w = x2 - x1;
     const geo = new THREE.BoxGeometry(w, H, T);
     ghostMesh = new THREE.Mesh(geo, ghostMat);
-    ghostMesh.position.set(x1 + w / 2, H / 2, startPt.z);
+    ghostMesh.position.set(x1 + w / 2, H / 2 + yBase, startPt.z);
   } else {
     const z1 = Math.min(startPt.z, endPt.z);
     const z2 = Math.max(startPt.z, endPt.z);
     const d = z2 - z1;
     const geo = new THREE.BoxGeometry(T, H, d);
     ghostMesh = new THREE.Mesh(geo, ghostMat);
-    ghostMesh.position.set(startPt.x, H / 2, z1 + d / 2);
+    ghostMesh.position.set(startPt.x, H / 2 + yBase, z1 + d / 2);
   }
 
   scene.add(ghostMesh);
@@ -116,20 +120,37 @@ export function onWallClick(event) {
     return true;
   }
 
+  const floor = getCurrentFloor();
   let rec;
   if (dx >= dz) {
     const x1 = Math.min(startPoint.x, snapped.x);
     const x2 = Math.max(startPoint.x, snapped.x);
-    rec = createWallRecord('h', { z: startPoint.z, x1, x2 });
+    rec = createWallRecord('h', { z: startPoint.z, x1, x2 }, floor);
   } else {
     const z1 = Math.min(startPoint.z, snapped.z);
     const z2 = Math.max(startPoint.z, snapped.z);
-    rec = createWallRecord('v', { x: startPoint.x, z1, z2 });
+    rec = createWallRecord('v', { x: startPoint.x, z1, z2 }, floor);
   }
 
   wallRecords.set(rec.id, rec);
   addWallFromRecord(rec);
   putWall(rec); // fire-and-forget
+
+  // History: undo removes the wall, redo re-adds it
+  const savedRec = { ...rec };
+  pushAction({
+    label: 'Place wall',
+    undo() {
+      removeWallById(savedRec.id);
+      wallRecords.delete(savedRec.id);
+      dbDeleteWall(savedRec.id);
+    },
+    redo() {
+      wallRecords.set(savedRec.id, savedRec);
+      addWallFromRecord(savedRec);
+      putWall(savedRec);
+    },
+  });
 
   startPoint = null;
   clearGhost();
@@ -190,10 +211,27 @@ export function deselectWall() {
 export function deleteSelectedWall() {
   if (!selectedWallId) return false;
   const id = selectedWallId;
+  const savedRec = wallRecords.get(id) ? { ...wallRecords.get(id) } : null;
   deselectWall();
   removeWallById(id);
   wallRecords.delete(id);
   dbDeleteWall(id); // fire-and-forget
+
+  if (savedRec) {
+    pushAction({
+      label: 'Delete wall',
+      undo() {
+        wallRecords.set(savedRec.id, savedRec);
+        addWallFromRecord(savedRec);
+        putWall(savedRec);
+      },
+      redo() {
+        removeWallById(savedRec.id);
+        wallRecords.delete(savedRec.id);
+        dbDeleteWall(savedRec.id);
+      },
+    });
+  }
   return true;
 }
 

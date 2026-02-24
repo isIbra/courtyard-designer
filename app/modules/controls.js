@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { camera, renderer } from './scene.js';
 import { setCeilingsVisible, wallMeshes } from './apartment.js';
+import { getCurrentFloor, getYBase, switchFloor, FLOOR_HEIGHT, getFloorCount } from './floor-manager.js';
+import { stairRecords } from './stair-builder.js';
 
 // ── State ──
 export let viewMode = 'orbit';
@@ -17,12 +19,15 @@ const walkState = {
   left: false,
   right: false,
   locked: false,
+  targetY: 1.7,
 };
 
 const WALK_SPEED = 4.5;
 const MOUSE_SENS = 0.002;
 const COLLISION_DIST = 0.4;
 const MAX_DT = 0.1;
+const EYE_HEIGHT = 1.7;
+const Y_LERP_SPEED = 8.0; // smooth Y transition speed
 const _ray = new THREE.Raycaster();
 
 // ── Orbit ──
@@ -57,7 +62,9 @@ export function setViewMode(mode) {
   }
 
   if (mode === 'walk') {
-    walkState.pos.set(20, 1.7, 17);
+    const yBase = getYBase(getCurrentFloor());
+    walkState.pos.set(20, yBase + EYE_HEIGHT, 17);
+    walkState.targetY = yBase + EYE_HEIGHT;
     walkState.yaw = Math.PI;
     walkState.pitch = 0;
   }
@@ -111,6 +118,51 @@ export function onKeyUp(key) {
   if (k === 'd') walkState.right = false;
 }
 
+/** Check if position is on a stair and return the Y height */
+function getStairY(x, z) {
+  for (const rec of stairRecords.values()) {
+    const fromY = getYBase(rec.fromFloor);
+    const w = rec.width || 1.0;
+    const len = rec.length || 3.0;
+
+    let progress = -1;
+    let onStair = false;
+
+    switch (rec.direction) {
+      case 'north':
+        if (Math.abs(x - rec.x) < w / 2 && z <= rec.z && z >= rec.z - len) {
+          progress = (rec.z - z) / len;
+          onStair = true;
+        }
+        break;
+      case 'south':
+        if (Math.abs(x - rec.x) < w / 2 && z >= rec.z && z <= rec.z + len) {
+          progress = (z - rec.z) / len;
+          onStair = true;
+        }
+        break;
+      case 'east':
+        if (Math.abs(z - rec.z) < w / 2 && x >= rec.x && x <= rec.x + len) {
+          progress = (x - rec.x) / len;
+          onStair = true;
+        }
+        break;
+      case 'west':
+        if (Math.abs(z - rec.z) < w / 2 && x <= rec.x && x >= rec.x - len) {
+          progress = (rec.x - x) / len;
+          onStair = true;
+        }
+        break;
+    }
+
+    if (onStair && progress >= 0 && progress <= 1) {
+      return fromY + progress * FLOOR_HEIGHT + EYE_HEIGHT;
+    }
+  }
+
+  return null;
+}
+
 // ── Update (called each frame) ──
 export function updateControls(dt) {
   if (viewMode === 'orbit' && orbitControls) {
@@ -120,7 +172,6 @@ export function updateControls(dt) {
   if (viewMode === 'walk') {
     dt = Math.min(dt, MAX_DT);
 
-    // Forward/right vectors derived from yaw (must match look direction)
     const fwd = new THREE.Vector3(Math.sin(walkState.yaw), 0, -Math.cos(walkState.yaw));
     const rgt = new THREE.Vector3(Math.cos(walkState.yaw), 0, Math.sin(walkState.yaw));
 
@@ -129,36 +180,63 @@ export function updateControls(dt) {
     if (walkState.backward) dir.sub(fwd);
     if (walkState.right) dir.add(rgt);
     if (walkState.left) dir.sub(rgt);
-    if (dir.lengthSq() === 0) {
-      // No movement — just update camera look
-    } else {
+
+    if (dir.lengthSq() > 0) {
       dir.normalize();
       const step = dir.multiplyScalar(WALK_SPEED * dt);
 
-      // Collision: test X and Z axes independently
-      const origin = new THREE.Vector3(walkState.pos.x, 1.0, walkState.pos.z);
+      // Collision: test X and Z axes independently (only against walls on current and adjacent floors)
+      const currentFloor = getCurrentFloor();
+      const relevantWalls = wallMeshes.filter((m) => {
+        const f = m.userData.floor || 0;
+        return f === currentFloor || f === currentFloor - 1 || f === currentFloor + 1;
+      });
 
-      // Test X movement
+      const origin = new THREE.Vector3(walkState.pos.x, walkState.pos.y - 0.7, walkState.pos.z);
+
       if (Math.abs(step.x) > 0.001) {
         _ray.set(origin, new THREE.Vector3(Math.sign(step.x), 0, 0));
         _ray.far = Math.abs(step.x) + COLLISION_DIST;
-        const hitsX = _ray.intersectObjects(wallMeshes);
+        const hitsX = _ray.intersectObjects(relevantWalls);
         if (hitsX.length > 0 && hitsX[0].distance < Math.abs(step.x) + COLLISION_DIST) {
           step.x = 0;
         }
       }
 
-      // Test Z movement
       if (Math.abs(step.z) > 0.001) {
         _ray.set(origin, new THREE.Vector3(0, 0, Math.sign(step.z)));
         _ray.far = Math.abs(step.z) + COLLISION_DIST;
-        const hitsZ = _ray.intersectObjects(wallMeshes);
+        const hitsZ = _ray.intersectObjects(relevantWalls);
         if (hitsZ.length > 0 && hitsZ[0].distance < Math.abs(step.z) + COLLISION_DIST) {
           step.z = 0;
         }
       }
 
-      walkState.pos.add(step);
+      walkState.pos.x += step.x;
+      walkState.pos.z += step.z;
+    }
+
+    // Y position: check for stairs, otherwise use floor base
+    const stairY = getStairY(walkState.pos.x, walkState.pos.z);
+    if (stairY !== null) {
+      walkState.targetY = stairY;
+    } else {
+      walkState.targetY = getYBase(getCurrentFloor()) + EYE_HEIGHT;
+    }
+
+    // Smooth Y transition
+    walkState.pos.y += (walkState.targetY - walkState.pos.y) * Math.min(1, Y_LERP_SPEED * dt);
+
+    // Auto-switch floor when reaching stair top/bottom
+    const currentFloor = getCurrentFloor();
+    const currentYBase = getYBase(currentFloor);
+    const aboveYBase = getYBase(currentFloor + 1);
+    const belowYBase = currentFloor > 0 ? getYBase(currentFloor - 1) : 0;
+
+    if (currentFloor + 1 < getFloorCount() && walkState.pos.y > aboveYBase + EYE_HEIGHT - 0.3) {
+      switchFloor(currentFloor + 1);
+    } else if (currentFloor > 0 && walkState.pos.y < currentYBase + EYE_HEIGHT - 0.3) {
+      switchFloor(currentFloor - 1);
     }
 
     camera.position.copy(walkState.pos);
@@ -173,7 +251,7 @@ export function updateControls(dt) {
     // Update position display during walk mode
     const posInfo = document.getElementById('pos-info');
     if (posInfo) {
-      posInfo.textContent = `X:${walkState.pos.x.toFixed(1)} Z:${walkState.pos.z.toFixed(1)}`;
+      posInfo.textContent = `X:${walkState.pos.x.toFixed(1)} Z:${walkState.pos.z.toFixed(1)} F:${getCurrentFloor()}`;
     }
   }
 
