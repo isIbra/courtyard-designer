@@ -372,6 +372,46 @@ body {
 }
 
 /* ================================================================
+   SUN SLIDER
+   ================================================================ */
+.sun-slider-section {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.slider-label {
+  font-size: 16px;
+}
+
+.sun-range {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: linear-gradient(to right, #c87030, #ffe8a0, #c87030);
+  border-radius: 2px;
+  outline: none;
+}
+
+.sun-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(200, 169, 110, 0.5);
+}
+
+/* ================================================================
    ROOM LIST
    ================================================================ */
 .room-item {

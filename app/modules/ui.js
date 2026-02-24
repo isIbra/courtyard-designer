@@ -2,7 +2,7 @@ import { CATALOG, createMesh, placeItem, removeItem, placed } from './furniture.
 import { ROOMS } from './apartment.js';
 import { setViewMode, viewMode, requestPointerLock, onTopZoom } from './controls.js';
 import { saveState, loadState, resetState, autoSave } from './persistence.js';
-import { camera, renderer } from './scene.js';
+import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
 import * as THREE from 'three';
 
@@ -74,7 +74,7 @@ function buildCategoryBar() {
 // ── Room list ──
 function buildRoomList() {
   const list = document.getElementById('room-list');
-  const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard', x: 9.35, z: 0, w: 6.91, d: 11.20 }];
+  const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard', x: 9.10, z: 0, w: 6.91, d: 11.20 }];
 
   for (const room of allRooms) {
     const div = document.createElement('div');
@@ -199,6 +199,14 @@ export function initUI() {
       document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
     });
   });
+
+  // Sun slider
+  const sunSlider = document.getElementById('sun-slider');
+  if (sunSlider) {
+    sunSlider.addEventListener('input', (e) => {
+      updateSun(e.target.value / 100);
+    });
+  }
 
   // Save / Reset
   document.getElementById('btn-save').addEventListener('click', () => {

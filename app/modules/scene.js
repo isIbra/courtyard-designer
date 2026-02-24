@@ -70,8 +70,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-// Higher exposure — Riyadh midday is intensely bright
-renderer.toneMappingExposure = 1.6;
+renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 /* ── Post-processing ── */
@@ -135,8 +134,8 @@ export function initLights() {
   const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.55);
   scene.add(hemi);
 
-  // Primary sun — warm white with golden bias, strong intensity
-  sunLight = new THREE.DirectionalLight(0xfff0d0, 2.8);
+  // Primary sun — warm white with golden bias
+  sunLight = new THREE.DirectionalLight(0xfff0d0, 1.6);
   sunLight.position.set(8, 18, 5);
   sunLight.castShadow = true;
   // 4096 shadow map for crisp, detailed shadows
@@ -195,7 +194,7 @@ export function updateSun(t01) {
   );
 
   // Intensity peaks at solar noon, drops at edges
-  sunLight.intensity = 1.2 + sinA * 2.0;
+  sunLight.intensity = 0.8 + sinA * 1.0;
 
   // Sky color shifts: golden-hour warmth at extremes, pale warm blue at noon
   // Red channel stays high (warm), green follows sun, blue is always subdued

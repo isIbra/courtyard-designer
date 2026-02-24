@@ -6,21 +6,21 @@ import { camera } from './scene.js';
 const canvas = document.getElementById('minimap');
 const ctx = canvas.getContext('2d');
 
-const MIN_X = -0.5;
-const MIN_Z = -0.5;
-const MAX_X = 17;
-const MAX_Z = 12;
+const MIN_X = -2;
+const MIN_Z = -2;
+const MAX_X = 50;
+const MAX_Z = 34;
 
 const ROOM_COLORS = {
+  closet:    '#4a4540',
   staircase: '#4a4a5a',
   bedroom:   '#5a5040',
-  wc:        '#404855',
-  foyer:     '#4a4540',
-  corridor:  '#3a3a40',
+  bathroom:  '#404855',
+  storage:   '#3a3a3a',
   living:    '#504a38',
   kitchen:   '#484840',
-  bathroom:  '#404855',
-  utility:   '#3a3a3a',
+  guestroom: '#4a4540',
+  guestbath: '#404855',
 };
 
 function toCanvas(x, z) {
@@ -53,17 +53,30 @@ export function drawMinimap() {
     ctx.fillText(room.name, (px + px2) / 2, (pz + pz2) / 2 + 3);
   }
 
-  // Courtyard
-  const [cx1, cz1] = toCanvas(9.35, 0);
-  const [cx2, cz2] = toCanvas(16.26, 11.20);
+  // Courtyard L-shape (matches courtyard.js P points, converted to building coords)
+  const OX = 9.10;
+  const OZ_FLIP = 11.20;
+  const courtyardPts = [
+    [0, 0], [0, 7.11], [0.63, 7.11], [0.63, 11.20],
+    [5.18, 11.20], [5.18, 3.20], [6.91, 3.20], [6.91, 0],
+  ].map(([cx, cy]) => toCanvas(OX + cx, OZ_FLIP - cy));
+
   ctx.fillStyle = 'rgba(100, 140, 100, 0.15)';
-  ctx.fillRect(cx1, cz1, cx2 - cx1, cz2 - cz1);
+  ctx.beginPath();
+  ctx.moveTo(courtyardPts[0][0], courtyardPts[0][1]);
+  for (let i = 1; i < courtyardPts.length; i++) {
+    ctx.lineTo(courtyardPts[i][0], courtyardPts[i][1]);
+  }
+  ctx.closePath();
+  ctx.fill();
   ctx.strokeStyle = 'rgba(200, 169, 110, 0.3)';
-  ctx.strokeRect(cx1, cz1, cx2 - cx1, cz2 - cz1);
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
   ctx.fillStyle = 'rgba(200, 169, 110, 0.5)';
   ctx.font = '9px Outfit';
   ctx.textAlign = 'center';
-  ctx.fillText('Courtyard', (cx1 + cx2) / 2, (cz1 + cz2) / 2 + 3);
+  const [clx, clz] = toCanvas(OX + 3.0, OZ_FLIP - 5.6);
+  ctx.fillText('Courtyard', clx, clz + 3);
 
   // Furniture dots
   for (const item of placed) {

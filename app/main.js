@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { scene, renderer, camera, initLights, updateSun, resize, composer, initPostProcessing } from './modules/scene.js';
 import { buildApartment, setCeilingsVisible } from './modules/apartment.js';
-import { buildCourtyard } from './modules/courtyard.js';
+// import { buildCourtyard } from './modules/courtyard.js';
 import { initOrbit, updateControls, onWalkMouseMove, onKeyDown, onKeyUp, viewMode } from './modules/controls.js';
 import { loadState } from './modules/persistence.js';
 import { initUI, toast } from './modules/ui.js';
 import { drawMinimap } from './modules/minimap.js';
+import { buildReference } from './modules/reference.js';
 
 // ── Init ──
 function init() {
@@ -13,7 +14,8 @@ function init() {
   initLights();
   initPostProcessing();
   buildApartment();
-  buildCourtyard();
+  // buildCourtyard(); // disabled — walls built by new buildApartment
+  buildReference();
   initOrbit();
   initUI();
   updateSun(0.65);
