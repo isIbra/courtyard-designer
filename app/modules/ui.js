@@ -4,12 +4,13 @@ import { setViewMode, viewMode, requestPointerLock, onTopZoom } from './controls
 import { saveState, resetState, autoSave, saveFloorMaterial, saveWallColor } from './persistence.js';
 import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
-import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall } from './wall-builder.js';
+import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall, copyFloorLayoutUp, isOpeningSubMode } from './wall-builder.js';
 import { createProceduralTexture, TEXTURE_TYPES, TEXTURE_NAMES, TEXTURE_SWATCH_COLORS } from './textures.js';
 import { getCurrentFloor, switchFloor, addFloor, getFloors, getFloorCount, setOnFloorChange, getYBase } from './floor-manager.js';
 import { toggleFloorBuildMode, isFloorBuildMode, onFloorClick, onFloorMouseMove, onFloorSelect, onFloorKeyDown, deselectTile, applyTileTexture, getSelectedTileId, floorTileRecords } from './floor-builder.js';
 import { toggleStairBuildMode, isStairBuildMode, onStairClick, onStairMouseMove, onStairSelect, onStairKeyDown, deselectStair, rotateStairDirection, updateStairVisibility } from './stair-builder.js';
 import { onSelectionClick, onBoxSelectStart, onBoxSelectMove, onBoxSelectEnd, onSelectionKeyDown, clearSelection, getSelected, getSelectedCount, highlightObj, unhighlightObj } from './selection.js';
+import { createGridOverlay, toggleGridVisible, updateGridFloor, showLowerFloorGhosts, clearLowerFloorGhosts } from './grid.js';
 import { removeWallById, wallMeshMap, addWallFromRecord } from './apartment.js';
 import { wallRecords, deleteSelectedWall, getSelectedWallId } from './wall-builder.js';
 import { removeFloorTile, addFloorTile, floorTileMeshes } from './floor-builder.js';
@@ -1045,6 +1046,8 @@ export function initUI() {
   setOnFloorChange((level) => {
     buildFloorSwitcher();
     updateStairVisibility(level);
+    updateGridFloor(level);
+    showLowerFloorGhosts(wallRecords, level);
   });
 
   // View mode buttons
@@ -1160,6 +1163,33 @@ export function initUI() {
       paintBtn.classList.toggle('active', on);
     });
   }
+
+  // Grid toggle button
+  const gridBtn = document.getElementById('btn-grid');
+  if (gridBtn) {
+    gridBtn.addEventListener('click', () => {
+      const on = toggleGridVisible();
+      gridBtn.classList.toggle('active', on);
+      toast(on ? 'Grid ON' : 'Grid OFF');
+    });
+  }
+
+  // Copy Floor button
+  const copyFloorBtn = document.getElementById('btn-copy-floor');
+  if (copyFloorBtn) {
+    copyFloorBtn.addEventListener('click', () => {
+      const count = copyFloorLayoutUp(getCurrentFloor());
+      if (count > 0) {
+        toast(`Copied ${count} wall${count > 1 ? 's' : ''} to floor ${getCurrentFloor() + 1}`);
+        autoSave();
+      } else {
+        toast('No custom walls to copy');
+      }
+    });
+  }
+
+  // Create grid overlay (hidden by default)
+  createGridOverlay();
 
   // Save / Reset
   document.getElementById('btn-save').addEventListener('click', () => {
@@ -1421,8 +1451,12 @@ export function initUI() {
       return;
     }
 
-    // W toggles wall mode (only when not in walk mode)
+    // W toggles wall mode (only when not in walk mode, and no wall selected)
     if ((e.key === 'w' || e.key === 'W') && viewMode !== 'walk') {
+      // If a wall is selected, let wall-builder handle W for window placement
+      if (getSelectedWallId()) {
+        if (onWallKeyDown(e.key)) return;
+      }
       deactivateEraser();
       deactivateFurnitureMoveMode();
       deactivatePaintMode();
@@ -1463,6 +1497,15 @@ export function initUI() {
     if ((e.key === 'p' || e.key === 'P') && viewMode !== 'walk') {
       const on = togglePaintMode();
       toast(on ? 'Paint mode ON — click walls to paint' : 'Paint mode OFF');
+      return;
+    }
+
+    // G toggles grid overlay (only when not in walk mode)
+    if ((e.key === 'g' || e.key === 'G') && viewMode !== 'walk') {
+      const on = toggleGridVisible();
+      const gridBtn = document.getElementById('btn-grid');
+      if (gridBtn) gridBtn.classList.toggle('active', on);
+      toast(on ? 'Grid ON' : 'Grid OFF');
       return;
     }
 

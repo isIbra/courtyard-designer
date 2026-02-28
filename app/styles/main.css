@@ -987,6 +987,73 @@ body {
   box-shadow: 0 0 16px rgba(200, 169, 110, 0.15);
 }
 
+/* ================================================================
+   TEMPLATE PICKER OVERLAY
+   ================================================================ */
+#template-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#template-overlay.hidden {
+  display: none;
+}
+
+.template-box {
+  text-align: center;
+  padding: 48px 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.4);
+  min-width: 360px;
+  max-width: 440px;
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.template-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.25s var(--ease-out-expo);
+}
+
+.template-option:hover {
+  border-color: rgba(200, 169, 110, 0.4);
+  background: rgba(200, 169, 110, 0.06);
+  box-shadow: 0 0 16px rgba(200, 169, 110, 0.08);
+}
+
+.template-option-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+}
+
+.template-option-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* ── Toolbar user display ── */
 .toolbar-user {
   font-family: var(--font-mono);

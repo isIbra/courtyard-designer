@@ -1,0 +1,9 @@
+node_modules
+.git
+dist
+server/data.db
+server/data.db-wal
+server/data.db-shm
+*.blend1
+__pycache__
+*.pyc

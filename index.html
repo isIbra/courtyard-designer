@@ -32,6 +32,8 @@
       <button class="tool-btn" id="btn-eraser" title="Eraser (E)">Eraser</button>
       <button class="tool-btn" id="btn-move" title="Move furniture (C)">Move</button>
       <button class="tool-btn" id="btn-paint" title="Paint walls (P)">Paint</button>
+      <button class="tool-btn" id="btn-grid" title="Toggle grid (G)">Grid</button>
+      <button class="tool-btn" id="btn-copy-floor" title="Copy walls to next floor">Copy ↑</button>
       <span class="divider"></span>
       <button class="tool-btn" id="btn-save" title="Save">💾</button>
       <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)">↩</button>
@@ -109,6 +111,15 @@
     </div>
   </div>
 
+  <!-- Template picker overlay -->
+  <div id="template-overlay" class="hidden">
+    <div class="template-box">
+      <div class="login-title">Choose a Starting Point</div>
+      <div class="login-subtitle">Pick a template or start with an empty canvas</div>
+      <div id="template-list" class="template-list"></div>
+    </div>
+  </div>
+
   <!-- Controls hint -->
   <div id="controls-hint">
     <span><kbd>WASD</kbd> Move</span>
@@ -122,6 +133,7 @@
     <span><kbd>F</kbd> Floor</span>
     <span><kbd>S</kbd> Stairs</span>
     <span><kbd>P</kbd> Paint</span>
+    <span><kbd>G</kbd> Grid</span>
     <span><kbd>PgUp/Dn</kbd> Floors</span>
   </div>
 

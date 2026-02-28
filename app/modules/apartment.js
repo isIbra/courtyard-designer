@@ -8,20 +8,10 @@ export const T = 0.35;
 export const H = 3.0;
 export const DOOR_H = 2.1;
 
-export const ROOMS = [
-  { id: 'closet',       name: 'Closet',       x: 0.83,  z: 1.41,  w: 4.68,  d: 11.65, floorType: 'wood_oak' },
-  { id: 'staircase',    name: 'Staircase',    x: 5.93,  z: 1.41,  w: 5.96,  d: 11.56, floorType: 'concrete_smooth' },
-  { id: 'bedroom',      name: 'Bedroom',      x: 11.89, z: 2.49,  w: 19.94, d: 10.75, floorType: 'wood_walnut' },
-  { id: 'bathroom',     name: 'Bathroom',     x: 25.59, z: 2.49,  w: 6.24,  d: 6.18,  floorType: 'tile_square',     yOffset: 0.015 },
-  { id: 'living',       name: 'Living Room',  x: 0.83,  z: 13.24, w: 29.32, d: 7.06,  floorType: 'wood_herringbone' },
-  { id: 'living_south', name: 'Living South', x: 11.89, z: 20.30, w: 18.26, d: 4.74,  floorType: 'wood_herringbone' },
-  { id: 'storage',      name: 'Storage',      x: 0.83,  z: 20.30, w: 2.20,  d: 4.74,  floorType: 'concrete_rough',  yOffset: 0.015 },
-  { id: 'kitchen',      name: 'Kitchen',      x: 3.03,  z: 20.30, w: 8.86,  d: 4.74,  floorType: 'tile_subway',     yOffset: 0.015 },
-  { id: 'guestroom',    name: 'Guest Room',   x: 0.83,  z: 25.04, w: 8.17,  d: 6.09,  floorType: 'wood_ash' },
-  { id: 'room2',        name: 'Room 2',       x: 9.0,   z: 25.04, w: 9.50,  d: 6.09,  floorType: 'wood_oak' },
-  { id: 'room3',        name: 'Room 3',       x: 18.50, z: 25.04, w: 4.30,  d: 6.09,  floorType: 'wood_oak' },
-  { id: 'room4',        name: 'Room 4',       x: 22.80, z: 25.04, w: 7.35,  d: 6.09,  floorType: 'wood_walnut' },
-];
+export let ROOMS = [];
+
+/** Set rooms array dynamically (called after loading from server) */
+export function setRooms(newRooms) { ROOMS = newRooms || []; }
 
 export const floorMeshes = [];
 export const wallMeshes = [];
@@ -330,7 +320,13 @@ const highlightMat = new THREE.MeshStandardMaterial({
 
 // ── Data-driven wall creation ──
 export function addWallFromRecord(rec) {
-  const wallH = rec.H || H;
+  // Delegate to openings builder if wall has openings
+  if (rec.openings && rec.openings.length > 0) {
+    return addWallWithOpenings(rec);
+  }
+
+  const baseH = rec.H || H;
+  const wallH = baseH * (rec.heightFloors || 1);
   const wallT = rec.T || T;
   const floorLevel = rec.floor || 0;
   const yBase = floorLevel * FLOOR_HEIGHT;
@@ -359,6 +355,94 @@ export function addWallFromRecord(rec) {
   return mesh;
 }
 
+// ── Wall with door/window openings (segment splitting, no CSG) ──
+
+function addWallWithOpenings(rec) {
+  const baseH = rec.H || H;
+  const wallH = baseH * (rec.heightFloors || 1);
+  const wallT = rec.T || T;
+  const floorLevel = rec.floor || 0;
+  const yBase = floorLevel * FLOOR_HEIGHT;
+
+  const wallLen = rec.type === 'h' ? (rec.x2 - rec.x1) : (rec.z2 - rec.z1);
+  if (wallLen < 0.05) return null;
+
+  const group = new THREE.Group();
+  group.userData.wallId = rec.id;
+  group.userData.wallRecord = rec;
+  group.userData.floor = floorLevel;
+
+  // Sort openings by position
+  const sorted = [...rec.openings].sort((a, b) => a.pos - b.pos);
+
+  // Build solid segments + lintels around openings
+  let cursor = 0;
+
+  for (const op of sorted) {
+    const halfW = op.w / 2;
+    const opStart = op.pos - halfW;
+    const opEnd = op.pos + halfW;
+
+    // Solid segment before opening
+    if (opStart > cursor + 0.01) {
+      addWallSegment(group, rec, cursor, opStart, 0, wallH, wallT, yBase);
+    }
+
+    // Below sill (for windows)
+    if (op.sillH > 0.01) {
+      addWallSegment(group, rec, opStart, opEnd, 0, op.sillH, wallT, yBase);
+    }
+
+    // Above opening (lintel to ceiling)
+    const topOfOpening = op.sillH + op.h;
+    if (topOfOpening < wallH - 0.01) {
+      addWallSegment(group, rec, opStart, opEnd, topOfOpening, wallH - topOfOpening, wallT, yBase);
+    }
+
+    cursor = opEnd;
+  }
+
+  // Solid segment after last opening
+  if (cursor < wallLen - 0.01) {
+    addWallSegment(group, rec, cursor, wallLen, 0, wallH, wallT, yBase);
+  }
+
+  // Position group
+  if (rec.type === 'h') {
+    group.position.set(rec.x1, yBase, rec.z);
+  } else {
+    group.position.set(rec.x, yBase, rec.z1);
+  }
+
+  scene.add(group);
+  wallMeshes.push(group);
+  wallMeshMap.set(rec.id, group);
+  return group;
+}
+
+function addWallSegment(group, rec, startAlong, endAlong, bottomY, segH, wallT, _yBase) {
+  const segLen = endAlong - startAlong;
+  if (segLen < 0.01 || segH < 0.01) return;
+
+  let geo;
+  const mesh = new THREE.Mesh(undefined, wallMat);
+
+  if (rec.type === 'h') {
+    geo = new THREE.BoxGeometry(segLen, segH, wallT);
+    mesh.position.set(startAlong + segLen / 2, bottomY + segH / 2, 0);
+  } else {
+    geo = new THREE.BoxGeometry(wallT, segH, segLen);
+    mesh.position.set(0, bottomY + segH / 2, startAlong + segLen / 2);
+  }
+
+  mesh.geometry = geo;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.wallId = rec.id;
+  mesh.userData.wallRecord = rec;
+  group.add(mesh);
+}
+
 export function removeWallById(id) {
   const mesh = wallMeshMap.get(id);
   if (!mesh) return;
@@ -366,12 +450,25 @@ export function removeWallById(id) {
   const idx = wallMeshes.indexOf(mesh);
   if (idx !== -1) wallMeshes.splice(idx, 1);
   wallMeshMap.delete(id);
-  mesh.geometry.dispose();
+  // Dispose geometry for both single meshes and groups
+  if (mesh.isGroup) {
+    mesh.traverse((c) => { if (c.isMesh && c.geometry) c.geometry.dispose(); });
+  } else {
+    mesh.geometry.dispose();
+  }
 }
 
 export function highlightWall(id) {
   const mesh = wallMeshMap.get(id);
-  if (mesh) {
+  if (!mesh) return;
+  if (mesh.isGroup) {
+    mesh.traverse((c) => {
+      if (c.isMesh) {
+        c._origMat = c.material;
+        c.material = highlightMat;
+      }
+    });
+  } else {
     mesh._origMat = mesh.material;
     mesh.material = highlightMat;
   }
@@ -379,7 +476,15 @@ export function highlightWall(id) {
 
 export function unhighlightWall(id) {
   const mesh = wallMeshMap.get(id);
-  if (mesh && mesh._origMat) {
+  if (!mesh) return;
+  if (mesh.isGroup) {
+    mesh.traverse((c) => {
+      if (c.isMesh && c._origMat) {
+        c.material = c._origMat;
+        delete c._origMat;
+      }
+    });
+  } else if (mesh._origMat) {
     mesh.material = mesh._origMat;
     delete mesh._origMat;
   }

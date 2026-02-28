@@ -5,6 +5,7 @@ import { scene, camera, renderer } from './scene.js';
 import { getCurrentFloor, getYBase, FLOOR_HEIGHT } from './floor-manager.js';
 import { putStair, deleteStair as dbDeleteStair } from './db.js';
 import { pushAction } from './history.js';
+import { snap as gridSnap, getFloorHit } from './grid.js';
 
 // ── State ──
 let buildMode = false;
@@ -18,7 +19,6 @@ export const stairMeshes = new Map(); // id -> THREE.Group
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-const SNAP = 1.0;
 const STAIR_WIDTH = 1.0;
 const STAIR_LENGTH = 3.0;
 const NUM_STEPS = 15;
@@ -26,19 +26,7 @@ const STEP_RISE = FLOOR_HEIGHT / NUM_STEPS; // 0.2m each
 const STEP_RUN = STAIR_LENGTH / NUM_STEPS;  // 0.2m each
 
 function snap(v) {
-  return Math.round(v / SNAP) * SNAP;
-}
-
-function getFloorHit(event) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const yBase = getYBase(getCurrentFloor());
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -yBase);
-  const pt = new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, pt);
-  return pt;
+  return gridSnap(v, 1.0);
 }
 
 // ── Build stair geometry ──

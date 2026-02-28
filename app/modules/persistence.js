@@ -5,7 +5,6 @@ import {
   getAllStairs, putAllStairs, clearStairs,
   getMeta, putMeta,
 } from './db.js';
-import { SEED_WALLS } from './wall-data.js';
 import { loadWallRecords, clearAllWalls, wallRecords } from './wall-builder.js';
 import { placed, placeItem, removeItem } from './furniture.js';
 import { loadFloorTiles, clearAllFloorTiles, floorTileRecords } from './floor-builder.js';
@@ -28,13 +27,11 @@ export function getUsername() {
 export async function initPersistence() {
   await openDB();
 
-  // Load walls (or seed on first run)
+  // Load walls from IDB (already populated by loadFromServer or empty for new users)
   let walls = await getAllWalls();
-  if (walls.length === 0) {
-    await putAllWalls(SEED_WALLS);
-    walls = [...SEED_WALLS];
+  if (walls.length > 0) {
+    loadWallRecords(walls);
   }
-  loadWallRecords(walls);
 
   // Load furniture from IndexedDB
   let furniture = await getAllFurniture();
@@ -70,17 +67,12 @@ export async function initPersistence() {
     );
   }
 
-  // Load floor tiles (or seed from ROOMS on first run)
+  // Load floor tiles (empty for new users — that's fine)
   let floorTiles = await getAllFloorTiles();
-  if (floorTiles.length === 0) {
-    // Auto-generate from ROOMS array
-    floorTiles = generateSeedFloorTiles();
-    await putAllFloorTiles(floorTiles);
+  if (floorTiles.length > 0) {
+    loadFloorTiles(floorTiles);
+    buildCeilings(floorTiles);
   }
-  loadFloorTiles(floorTiles);
-
-  // Build ceilings from floor tiles
-  buildCeilings(floorTiles);
 
   // Load stairs
   const stairs = await getAllStairs();
@@ -153,25 +145,19 @@ export function loadState() {
 }
 
 export function resetState() {
-  // Sync: clear scene immediately
+  // Clear scene
   clearAllWalls();
   while (placed.length > 0) removeItem(placed[0]);
   clearAllFloorTiles();
   clearAllStairs();
 
-  // Sync: reload seed walls + floor tiles into scene
-  loadWallRecords([...SEED_WALLS]);
-  const seedTiles = generateSeedFloorTiles();
-  loadFloorTiles(seedTiles);
-  buildCeilings(seedTiles);
-
-  // Async: persist to DB (fire-and-forget)
-  clearWalls().then(() => putAllWalls(SEED_WALLS));
+  // Persist empty state to IDB
+  clearWalls();
   clearFurniture();
-  clearFloorTiles().then(() => putAllFloorTiles(seedTiles));
+  clearFloorTiles();
   clearStairs();
 
-  // Sync reset to server too
+  // Sync empty to server
   if (currentUsername) syncToServer(currentUsername);
 }
 
@@ -232,7 +218,7 @@ export async function loadIndividualWallColors() {
 // ── Server sync ──
 
 export async function syncToServer(username) {
-  if (!username) return;
+  if (!username) return false;
   try {
     const walls = await getAllWalls();
     const furniture = await getAllFurniture();
@@ -240,14 +226,22 @@ export async function syncToServer(username) {
     const stairs = await getAllStairs();
     const floorRec = await getMeta('floorMaterials');
     const floorMaterials = floorRec ? floorRec.value : {};
+    const wallColorsRec = await getMeta('wallColors');
+    const wallColors = wallColorsRec ? wallColorsRec.value : {};
+    const indWallRec = await getMeta('individualWallColors');
+    const individualWallColors = indWallRec ? indWallRec.value : {};
+    const roomsRec = await getMeta('rooms');
+    const rooms = roomsRec ? roomsRec.value : [];
 
-    await fetch(`/api/state/${encodeURIComponent(username)}`, {
+    const res = await fetch(`/api/state/${encodeURIComponent(username)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walls, furniture, floorMaterials, floorTiles, stairs }),
+      body: JSON.stringify({ walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, rooms }),
     });
+    return res.ok;
   } catch (err) {
     console.warn('Server sync failed:', err);
+    return false;
   }
 }
 
@@ -278,6 +272,15 @@ export async function loadFromServer(username) {
     }
     if (state.floorMaterials) {
       await putMeta('floorMaterials', state.floorMaterials);
+    }
+    if (state.wallColors) {
+      await putMeta('wallColors', state.wallColors);
+    }
+    if (state.individualWallColors) {
+      await putMeta('individualWallColors', state.individualWallColors);
+    }
+    if (state.rooms) {
+      await putMeta('rooms', state.rooms);
     }
 
     return true; // data was loaded

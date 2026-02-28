@@ -54,5 +54,5 @@ export const SEED_WALLS = [
 
 export function createWallRecord(type, params, floor = 0) {
   const id = `w_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  return { id, type, ...params, H, T, isOriginal: false, floor };
+  return { id, type, ...params, H, T, isOriginal: false, floor, heightFloors: 1, openings: [] };
 }

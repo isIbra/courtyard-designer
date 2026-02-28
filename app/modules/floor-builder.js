@@ -6,6 +6,7 @@ import { getCurrentFloor, getYBase } from './floor-manager.js';
 import { createProceduralTexture } from './textures.js';
 import { putFloorTile, deleteFloorTile as dbDeleteTile } from './db.js';
 import { pushAction } from './history.js';
+import { snap as gridSnap, getFloorHit } from './grid.js';
 
 // ── State ──
 let buildMode = false;
@@ -19,22 +20,8 @@ export const floorTileMeshes = new Map(); // id -> mesh
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-const SNAP = 1.0; // 1m grid for floors (coarser than wall 0.25m)
-
 function snap(v) {
-  return Math.round(v / SNAP) * SNAP;
-}
-
-function getFloorHit(event) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const yBase = getYBase(getCurrentFloor());
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -yBase);
-  const pt = new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, pt);
-  return pt;
+  return gridSnap(v, 1.0); // 1m grid for floors
 }
 
 // ── Ghost preview ──
