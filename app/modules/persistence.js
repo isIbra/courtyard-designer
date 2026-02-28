@@ -10,7 +10,7 @@ import { loadWallRecords, clearAllWalls, wallRecords } from './wall-builder.js';
 import { placed, placeItem, removeItem } from './furniture.js';
 import { loadFloorTiles, clearAllFloorTiles, floorTileRecords } from './floor-builder.js';
 import { loadStairs, clearAllStairs, stairRecords } from './stair-builder.js';
-import { generateSeedFloorTiles, buildCeilings } from './apartment.js';
+import { generateSeedFloorTiles, buildCeilings, loadWallColors, setIndividualWallColor, wallMeshMap } from './apartment.js';
 
 const LS_KEY = 'courtyard-designer-v1';
 
@@ -62,7 +62,12 @@ export async function initPersistence() {
   }
 
   for (const f of furniture) {
-    placeItem(f.type, f.x, f.z, f.rotY, f.floor || 0);
+    const hasScale = (f.scaleX && f.scaleX !== 1) || (f.scaleY && f.scaleY !== 1) || (f.scaleZ && f.scaleZ !== 1);
+    placeItem(
+      f.type, f.x, f.z, f.rotY, f.floor || 0,
+      f.y != null ? f.y : null,
+      hasScale ? { x: f.scaleX || 1, y: f.scaleY || 1, z: f.scaleZ || 1 } : null
+    );
   }
 
   // Load floor tiles (or seed from ROOMS on first run)
@@ -83,6 +88,20 @@ export async function initPersistence() {
     loadStairs(stairs);
   }
 
+  // Load saved wall colors (per-room)
+  const wallColorsRec = await getMeta('wallColors');
+  if (wallColorsRec && wallColorsRec.value) {
+    loadWallColors(wallColorsRec.value);
+  }
+
+  // Load saved individual wall colors
+  const indWallRec = await getMeta('individualWallColors');
+  if (indWallRec && indWallRec.value) {
+    for (const [wallId, hex] of Object.entries(indWallRec.value)) {
+      setIndividualWallColor(wallId, hex);
+    }
+  }
+
   return {
     wallCount: walls.length,
     furnitureCount: furniture.length,
@@ -99,6 +118,10 @@ export function saveState() {
     z: m.position.z,
     rotY: m.rotation.y,
     floor: m.userData.floor || 0,
+    y: m.position.y,
+    scaleX: m.userData.customScale?.x || 1,
+    scaleY: m.userData.customScale?.y || 1,
+    scaleZ: m.userData.customScale?.z || 1,
   }));
   clearFurniture().then(() => putAllFurniture(items));
 
@@ -109,6 +132,17 @@ export function saveState() {
   // Save stairs
   const stairs = [...stairRecords.values()];
   clearStairs().then(() => putAllStairs(stairs));
+
+  // Save individual wall colors
+  const indColors = {};
+  for (const [id, mesh] of wallMeshMap.entries()) {
+    if (mesh.userData.customColor) {
+      indColors[id] = mesh.userData.customColor;
+    }
+  }
+  if (Object.keys(indColors).length > 0) {
+    putMeta('individualWallColors', indColors);
+  }
 
   return true;
 }
@@ -167,6 +201,31 @@ export async function saveFloorMaterial(roomId, texType) {
 
 export async function loadFloorMaterials() {
   const rec = await getMeta('floorMaterials');
+  return rec ? rec.value : {};
+}
+
+// ── Wall color persistence ──
+
+export async function saveWallColor(roomId, hex) {
+  const rec = await getMeta('wallColors');
+  const map = rec ? rec.value : {};
+  map[roomId] = hex;
+  await putMeta('wallColors', map);
+}
+
+export async function loadSavedWallColors() {
+  const rec = await getMeta('wallColors');
+  return rec ? rec.value : {};
+}
+
+// ── Individual wall color persistence ──
+
+export async function saveIndividualWallColors(colorMap) {
+  await putMeta('individualWallColors', colorMap);
+}
+
+export async function loadIndividualWallColors() {
+  const rec = await getMeta('individualWallColors');
   return rec ? rec.value : {};
 }
 

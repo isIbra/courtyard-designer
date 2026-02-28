@@ -199,6 +199,127 @@ const wallMat = new THREE.MeshStandardMaterial({
   metalness: 0.0,
 });
 
+// ── Wall Color System ──
+
+/** Default wall colors per room (warm off-white variants) */
+export const ROOM_WALL_COLORS = {
+  closet:       '#EBE0D0',
+  staircase:    '#E8DDD0',
+  bedroom:      '#EDE5D8',
+  bathroom:     '#F0EDE8',
+  living:       '#EBE0D0',
+  living_south: '#EBE0D0',
+  storage:      '#E5DDD0',
+  kitchen:      '#F0EBE0',
+  guestroom:    '#EDE5D8',
+  room2:        '#EBE0D0',
+  room3:        '#EBE0D0',
+  room4:        '#EDE5D8',
+};
+
+/** Preset wall color palette */
+export const WALL_COLOR_PALETTE = [
+  { name: 'Plaster',       hex: '#EBE0D0' },
+  { name: 'Warm White',    hex: '#F5F0E8' },
+  { name: 'Linen',         hex: '#F0E8D8' },
+  { name: 'Sage',          hex: '#C5CDB8' },
+  { name: 'Slate Blue',    hex: '#A0AAB8' },
+  { name: 'Dusty Rose',    hex: '#D4B0A8' },
+  { name: 'Terracotta',    hex: '#C08060' },
+  { name: 'Sand',          hex: '#D4C4A0' },
+  { name: 'Charcoal',      hex: '#484848' },
+  { name: 'Midnight',      hex: '#2A2A38' },
+  { name: 'Olive',         hex: '#808060' },
+  { name: 'Blush',         hex: '#E8C8C0' },
+];
+
+/** Current active wall colors (modified at runtime) */
+const activeWallColors = { ...ROOM_WALL_COLORS };
+
+/** Check if a wall mesh belongs to a room by position overlap */
+function wallBelongsToRoom(wallMesh, room) {
+  const rec = wallMesh.userData.wallRecord;
+  if (!rec) return false;
+  const margin = 0.5; // tolerance
+
+  if (rec.type === 'h') {
+    // Horizontal wall at z — check if z is near room top/bottom edges and x overlaps
+    const roomZ1 = room.z;
+    const roomZ2 = room.z + room.d;
+    const zNear = Math.abs(rec.z - roomZ1) < margin || Math.abs(rec.z - roomZ2) < margin ||
+                  (rec.z > roomZ1 - margin && rec.z < roomZ2 + margin);
+    const xOverlap = rec.x1 < (room.x + room.w + margin) && rec.x2 > (room.x - margin);
+    return zNear && xOverlap;
+  } else {
+    // Vertical wall at x — check if x is near room left/right edges and z overlaps
+    const roomX1 = room.x;
+    const roomX2 = room.x + room.w;
+    const xNear = Math.abs(rec.x - roomX1) < margin || Math.abs(rec.x - roomX2) < margin ||
+                  (rec.x > roomX1 - margin && rec.x < roomX2 + margin);
+    const zOverlap = rec.z1 < (room.z + room.d + margin) && rec.z2 > (room.z - margin);
+    return xNear && zOverlap;
+  }
+}
+
+/** Set wall color for a specific room */
+export function setWallColor(roomId, hex) {
+  activeWallColors[roomId] = hex;
+  const room = ROOMS.find(r => r.id === roomId);
+  if (!room) return;
+
+  const color = new THREE.Color(hex);
+  for (const mesh of wallMeshes) {
+    if (wallBelongsToRoom(mesh, room)) {
+      // Clone material if still shared
+      if (mesh.material === wallMat) {
+        mesh.material = wallMat.clone();
+      }
+      mesh.material.color.copy(color);
+      mesh.material.map = null;
+      mesh.material.needsUpdate = true;
+    }
+  }
+}
+
+/** Get current wall color for a room */
+export function getWallColor(roomId) {
+  return activeWallColors[roomId] || ROOM_WALL_COLORS[roomId] || '#EBE0D0';
+}
+
+/** Get all current wall colors */
+export function getAllWallColors() {
+  return { ...activeWallColors };
+}
+
+/** Load saved wall colors (from persistence) */
+export function loadWallColors(saved) {
+  if (!saved) return;
+  for (const [roomId, hex] of Object.entries(saved)) {
+    activeWallColors[roomId] = hex;
+    setWallColor(roomId, hex);
+  }
+}
+
+/** Set color for a specific individual wall by wallId */
+export function setIndividualWallColor(wallId, hex) {
+  const mesh = wallMeshMap.get(wallId);
+  if (!mesh) return;
+  // Clone material if still shared
+  if (mesh.material === wallMat) {
+    mesh.material = wallMat.clone();
+  }
+  mesh.material.color.set(hex);
+  mesh.material.map = null;
+  mesh.material.needsUpdate = true;
+  mesh.userData.customColor = hex;
+}
+
+/** Get current color for a specific individual wall */
+export function getIndividualWallColor(wallId) {
+  const mesh = wallMeshMap.get(wallId);
+  return mesh?.userData.customColor || null;
+}
+
 const highlightMat = new THREE.MeshStandardMaterial({
   color: 0xc8a96e,
   roughness: 0.8,

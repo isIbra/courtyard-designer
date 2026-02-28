@@ -3,12 +3,14 @@ import cors from 'cors';
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { WebSocketServer } from 'ws';
+import { handleUpgrade, relay, isConnected } from './ws-relay.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = 3051;
 
 // ── Middleware ──
 app.use(cors());
@@ -48,13 +50,30 @@ app.get('/api/state/:username', (req, res) => {
 
 // PUT /api/state/:username — save design
 app.put('/api/state/:username', (req, res) => {
-  const { walls, furniture, floorMaterials } = req.body;
+  const { walls, furniture, floorMaterials, floorTiles, stairs } = req.body;
   if (!walls && !furniture && !floorMaterials) {
     return res.status(400).json({ error: 'No state data provided' });
   }
-  const state = JSON.stringify({ walls, furniture, floorMaterials });
+  const state = JSON.stringify({ walls, furniture, floorMaterials, floorTiles, stairs });
   upsertStmt.run(req.params.username, state);
   res.json({ ok: true });
+});
+
+// ── Designer API relay ──
+
+app.get('/api/designer/status', (req, res) => {
+  res.json({ connected: isConnected() });
+});
+
+app.post('/api/designer/exec', async (req, res) => {
+  const { method, params } = req.body;
+  if (!method) return res.status(400).json({ error: 'Missing method' });
+  try {
+    const result = await relay(method, params || {});
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err.message });
+  }
 });
 
 // ── Static files (production) ──
@@ -64,7 +83,18 @@ app.get('{*path}', (req, res) => {
   res.sendFile(join(distPath, 'index.html'));
 });
 
-// ── Start ──
-app.listen(PORT, () => {
+// ── Start with WebSocket support ──
+const httpServer = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+const wss = new WebSocketServer({ noServer: true });
+httpServer.on('upgrade', (req, socket, head) => {
+  if (req.url === '/ws') {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      handleUpgrade(ws);
+    });
+  } else {
+    socket.destroy();
+  }
 });

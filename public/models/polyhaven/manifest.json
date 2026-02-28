@@ -1,0 +1,614 @@
+{
+  "ArmChair_01": {
+    "file": "ArmChair_01.glb",
+    "name": "Arm Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "BarberShopChair_01": {
+    "file": "BarberShopChair_01.glb",
+    "name": "Barber Shop Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "ClassicConsole_01": {
+    "file": "ClassicConsole_01.glb",
+    "name": "Classic Console 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "ClassicNightstand_01": {
+    "file": "ClassicNightstand_01.glb",
+    "name": "Classic Nightstand 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "CoffeeCart_01": {
+    "file": "CoffeeCart_01.glb",
+    "name": "Coffee Cart 01",
+    "categories": [
+      "appliances",
+      "props",
+      "furniture",
+      "office"
+    ]
+  },
+  "CoffeeTable_01": {
+    "file": "CoffeeTable_01.glb",
+    "name": "Coffee Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "GothicBed_01": {
+    "file": "GothicBed_01.glb",
+    "name": "Gothic Bed 01",
+    "categories": [
+      "furniture",
+      "bed"
+    ]
+  },
+  "GothicCabinet_01": {
+    "file": "GothicCabinet_01.glb",
+    "name": "Gothic Cabinet 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "GothicCommode_01": {
+    "file": "GothicCommode_01.glb",
+    "name": "Gothic Commode 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "GreenChair_01": {
+    "file": "GreenChair_01.glb",
+    "name": "Green Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "Ottoman_01": {
+    "file": "Ottoman_01.glb",
+    "name": "Ottoman 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "Rockingchair_01": {
+    "file": "Rockingchair_01.glb",
+    "name": "Rockingchair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "SchoolChair_01": {
+    "file": "SchoolChair_01.glb",
+    "name": "School Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "SchoolDesk_01": {
+    "file": "SchoolDesk_01.glb",
+    "name": "School Desk 01",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "Shelf_01": {
+    "file": "Shelf_01.glb",
+    "name": "Shelf 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "Sofa_01": {
+    "file": "Sofa_01.glb",
+    "name": "Sofa 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "WoodenChair_01": {
+    "file": "WoodenChair_01.glb",
+    "name": "Wooden Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "WoodenTable_01": {
+    "file": "WoodenTable_01.glb",
+    "name": "Wooden Table 01",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "WoodenTable_02": {
+    "file": "WoodenTable_02.glb",
+    "name": "Wooden Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "WoodenTable_03": {
+    "file": "WoodenTable_03.glb",
+    "name": "Wooden Table 03",
+    "categories": [
+      "furniture",
+      "collection: the_shed"
+    ]
+  },
+  "bar_chair_round_01": {
+    "file": "bar_chair_round_01.glb",
+    "name": "Bar Chair Round 01",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "chinese_armchair": {
+    "file": "chinese_armchair.glb",
+    "name": "Chinese Armchair",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "chinese_cabinet": {
+    "file": "chinese_cabinet.glb",
+    "name": "Chinese Cabinet",
+    "categories": [
+      "shelves",
+      "furniture"
+    ]
+  },
+  "chinese_commode": {
+    "file": "chinese_commode.glb",
+    "name": "Chinese Commode",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "chinese_console_table": {
+    "file": "chinese_console_table.glb",
+    "name": "Chinese Console Table",
+    "categories": [
+      "table",
+      "furniture"
+    ]
+  },
+  "chinese_screen_panels": {
+    "file": "chinese_screen_panels.glb",
+    "name": "Chinese Screen Panels",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "chinese_sofa": {
+    "file": "chinese_sofa.glb",
+    "name": "Chinese Sofa",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "chinese_stool": {
+    "file": "chinese_stool.glb",
+    "name": "Chinese Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "chinese_tea_table": {
+    "file": "chinese_tea_table.glb",
+    "name": "Chinese Tea Table",
+    "categories": [
+      "table",
+      "furniture"
+    ]
+  },
+  "coffee_table_round_01": {
+    "file": "coffee_table_round_01.glb",
+    "name": "Coffee Table Round 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "dining_chair_02": {
+    "file": "dining_chair_02.glb",
+    "name": "Dining Chair 02",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "drawer_cabinet": {
+    "file": "drawer_cabinet.glb",
+    "name": "Drawer Cabinet",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "folding_wooden_stool": {
+    "file": "folding_wooden_stool.glb",
+    "name": "Folding Wooden Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "gallinera_chair": {
+    "file": "gallinera_chair.glb",
+    "name": "Gallinera Chair",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "gallinera_table": {
+    "file": "gallinera_table.glb",
+    "name": "Gallinera Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "gothic_coffee_table": {
+    "file": "gothic_coffee_table.glb",
+    "name": "Gothic Coffee Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "industrial_coffee_table": {
+    "file": "industrial_coffee_table.glb",
+    "name": "Industrial Coffee Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "mid_century_lounge_chair": {
+    "file": "mid_century_lounge_chair.glb",
+    "name": "Mid Century Lounge Chair",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "modern_arm_chair_01": {
+    "file": "modern_arm_chair_01.glb",
+    "name": "Modern Arm Chair 01",
+    "categories": [
+      "furniture",
+      "seating",
+      "office"
+    ]
+  },
+  "modern_coffee_table_01": {
+    "file": "modern_coffee_table_01.glb",
+    "name": "Modern Coffee Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "modern_coffee_table_02": {
+    "file": "modern_coffee_table_02.glb",
+    "name": "Modern Coffee Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "modern_wooden_cabinet": {
+    "file": "modern_wooden_cabinet.glb",
+    "name": "Modern Wooden Cabinet",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "modular_street_seating": {
+    "file": "modular_street_seating.glb",
+    "name": "Modular Street Seating",
+    "categories": [
+      "furniture",
+      "seating",
+      "collection: hidden_alley"
+    ]
+  },
+  "ornate_mirror_01": {
+    "file": "ornate_mirror_01.glb",
+    "name": "Ornate Mirror 01",
+    "categories": [
+      "decorative",
+      "wall decoration",
+      "furniture"
+    ]
+  },
+  "outdoor_table_chair_set_01": {
+    "file": "outdoor_table_chair_set_01.glb",
+    "name": "Outdoor Table Chair Set 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_bench": {
+    "file": "painted_wooden_bench.glb",
+    "name": "Painted Wooden Bench",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_cabinet": {
+    "file": "painted_wooden_cabinet.glb",
+    "name": "Painted Wooden Cabinet",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "painted_wooden_cabinet_02": {
+    "file": "painted_wooden_cabinet_02.glb",
+    "name": "Painted Wooden Cabinet 02",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "painted_wooden_chair_01": {
+    "file": "painted_wooden_chair_01.glb",
+    "name": "Painted Wooden Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_chair_02": {
+    "file": "painted_wooden_chair_02.glb",
+    "name": "Painted Wooden Chair 02",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_nightstand": {
+    "file": "painted_wooden_nightstand.glb",
+    "name": "Painted Wooden Nightstand",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "painted_wooden_shelves": {
+    "file": "painted_wooden_shelves.glb",
+    "name": "Painted Wooden Shelves",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "painted_wooden_sofa": {
+    "file": "painted_wooden_sofa.glb",
+    "name": "Painted Wooden Sofa",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_stool": {
+    "file": "painted_wooden_stool.glb",
+    "name": "Painted Wooden Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "painted_wooden_table": {
+    "file": "painted_wooden_table.glb",
+    "name": "Painted Wooden Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "plastic_monobloc_chair_01": {
+    "file": "plastic_monobloc_chair_01.glb",
+    "name": "Plastic Monobloc Chair 01",
+    "categories": [
+      "furniture",
+      "seating",
+      "collection: the_shed"
+    ]
+  },
+  "round_wooden_table_01": {
+    "file": "round_wooden_table_01.glb",
+    "name": "Round Wooden Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "round_wooden_table_02": {
+    "file": "round_wooden_table_02.glb",
+    "name": "Round Wooden Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "side_table_01": {
+    "file": "side_table_01.glb",
+    "name": "Side Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "side_table_tall_01": {
+    "file": "side_table_tall_01.glb",
+    "name": "Side Table Tall 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "small_wooden_table_01": {
+    "file": "small_wooden_table_01.glb",
+    "name": "Small Wooden Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "sofa_02": {
+    "file": "sofa_02.glb",
+    "name": "Sofa 02",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "sofa_03": {
+    "file": "sofa_03.glb",
+    "name": "Sofa 03",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "steel_frame_shelves_01": {
+    "file": "steel_frame_shelves_01.glb",
+    "name": "Steel Frame Shelves 01",
+    "categories": [
+      "furniture",
+      "shelves",
+      "industrial",
+      "collection: the_shed"
+    ]
+  },
+  "steel_frame_shelves_02": {
+    "file": "steel_frame_shelves_02.glb",
+    "name": "Steel Frame Shelves 02",
+    "categories": [
+      "furniture",
+      "industrial",
+      "shelves",
+      "collection: the_shed"
+    ]
+  },
+  "steel_frame_shelves_03": {
+    "file": "steel_frame_shelves_03.glb",
+    "name": "Steel Frame Shelves 03",
+    "categories": [
+      "shelves",
+      "furniture"
+    ]
+  },
+  "stone_fire_pit": {
+    "file": "stone_fire_pit.glb",
+    "name": "Stone Fire Pit",
+    "categories": [
+      "structures",
+      "buildings",
+      "furniture",
+      "collection: the_shed"
+    ]
+  },
+  "vintage_cabinet_01": {
+    "file": "vintage_cabinet_01.glb",
+    "name": "Vintage Cabinet 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "vintage_wooden_drawer_01": {
+    "file": "vintage_wooden_drawer_01.glb",
+    "name": "Vintage Wooden Drawer 01",
+    "categories": [
+      "furniture",
+      "shelves",
+      "table"
+    ]
+  },
+  "wooden_bookshelf_worn": {
+    "file": "wooden_bookshelf_worn.glb",
+    "name": "Wooden Bookshelf Worn",
+    "categories": [
+      "furniture",
+      "shelves",
+      "collection: the_shed"
+    ]
+  },
+  "wooden_display_shelves_01": {
+    "file": "wooden_display_shelves_01.glb",
+    "name": "Wooden Display Shelves 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "wooden_picnic_table": {
+    "file": "wooden_picnic_table.glb",
+    "name": "Wooden Picnic Table",
+    "categories": [
+      "furniture",
+      "seating",
+      "table"
+    ]
+  },
+  "wooden_stool_01": {
+    "file": "wooden_stool_01.glb",
+    "name": "Wooden Stool 01",
+    "categories": [
+      "seating",
+      "furniture",
+      "collection: the_shed"
+    ]
+  },
+  "wooden_stool_02": {
+    "file": "wooden_stool_02.glb",
+    "name": "Wooden Stool 02",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "wooden_table_02": {
+    "file": "wooden_table_02.glb",
+    "name": "Wooden Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  }
+}

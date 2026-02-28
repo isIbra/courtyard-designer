@@ -5,7 +5,9 @@ import { initOrbit, updateControls, onWalkMouseMove, onKeyDown, onKeyUp, viewMod
 import { initPersistence, loadFloorMaterials, loadFromServer, setUsername, syncToServer } from './modules/persistence.js';
 import { initUI, toast, refreshFurnitureGrid } from './modules/ui.js';
 import { drawMinimap } from './modules/minimap.js';
-import { preloadModels, generateThumbnails } from './modules/furniture.js';
+import { preloadModels } from './modules/furniture.js';
+import { initDesignerAPI } from './modules/designer-api.js';
+import { initGizmo, shouldBypassPostProcessing } from './modules/gizmo.js';
 
 const USERNAME_KEY = 'courtyard-designer-username';
 
@@ -63,10 +65,11 @@ async function init() {
   initLights();
   initPostProcessing();
   initOrbit();
+  initGizmo();
   initUI();
   updateSun(0.65);
   preloadModels();
-  generateThumbnails().then(() => refreshFurnitureGrid());
+  refreshFurnitureGrid();
 
   // Start in orbit — hide ceilings
   setCeilingsVisible(false);
@@ -92,6 +95,9 @@ async function init() {
     syncToServer(username);
   }
 
+  // Initialize designer API (spatial index + WS client for MCP)
+  initDesignerAPI();
+
   // Walk mode mouse
   document.addEventListener('mousemove', (e) => {
     if (viewMode === 'walk') onWalkMouseMove(e);
@@ -112,7 +118,10 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
   updateControls(dt);
-  if (composer) {
+  // Skip post-processing when gizmo is active — the built-in Three.js
+  // EffectComposer swallows TransformControls' depthTest:false materials.
+  // Direct rendering makes the gizmo arrows visible.
+  if (composer && !shouldBypassPostProcessing()) {
     composer.render();
   } else {
     renderer.render(scene, camera);

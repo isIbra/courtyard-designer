@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+import { createProceduralTexture } from './textures.js';
 
 /* ── Sky gradient canvas (warm Riyadh desert sky) ── */
 function createDesertSkyTexture() {
@@ -29,28 +30,58 @@ function createDesertSkyTexture() {
   return texture;
 }
 
-/* ── Subtle environment cubemap for glass reflections ── */
-function createWarmEnvMap() {
-  const size = 128;
-  const cubeRT = new THREE.WebGLCubeRenderTarget(size);
-  const cubeScene = new THREE.Scene();
+/* ── PMREM environment map for realistic reflections ── */
+function createPMREMEnvMap(rendererRef) {
+  const pmremGen = new THREE.PMREMGenerator(rendererRef);
+  pmremGen.compileEquirectangularShader();
 
-  // Fill with warm gradient sphere so reflections pick up the desert tone
-  const gradientCanvas = document.createElement('canvas');
-  gradientCanvas.width = 256;
-  gradientCanvas.height = 256;
-  const ctx = gradientCanvas.getContext('2d');
-  const grad = ctx.createRadialGradient(128, 90, 10, 128, 128, 180);
-  grad.addColorStop(0.0, '#fff8e8');   // bright warm core (sun area)
-  grad.addColorStop(0.35, '#ddd0b8');  // sandy mid
-  grad.addColorStop(0.7, '#a09880');   // warm neutral
-  grad.addColorStop(1.0, '#5a6a7a');   // cooler edges
+  // Build a mini-scene for the environment
+  const envScene = new THREE.Scene();
+
+  // Sky dome with proper desert gradient
+  const skyGeo = new THREE.SphereGeometry(50, 32, 16);
+  const skyCanvas = document.createElement('canvas');
+  skyCanvas.width = 512;
+  skyCanvas.height = 256;
+  const ctx = skyCanvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, '#1a2a4a');   // zenith — deep warm blue
+  grad.addColorStop(0.25, '#5a7a9a');  // mid sky
+  grad.addColorStop(0.5, '#b0a890');   // haze
+  grad.addColorStop(0.75, '#d4c4a0');  // horizon
+  grad.addColorStop(1.0, '#e8d8b8');   // ground bounce
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillRect(0, 0, 512, 256);
+  const skyTex = new THREE.CanvasTexture(skyCanvas);
+  skyTex.mapping = THREE.EquirectangularReflectionMapping;
+  const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
+  envScene.add(new THREE.Mesh(skyGeo, skyMat));
 
-  const envTexture = new THREE.CanvasTexture(gradientCanvas);
-  envTexture.mapping = THREE.EquirectangularReflectionMapping;
-  return envTexture;
+  // Bright sun spot — emissive sphere in sun direction
+  const sunGeo = new THREE.SphereGeometry(2, 16, 8);
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff8e0 });
+  const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  sunMesh.position.set(15, 30, 8);
+  envScene.add(sunMesh);
+
+  // Sandy ground plane
+  const groundGeo = new THREE.PlaneGeometry(100, 100);
+  const groundMat = new THREE.MeshBasicMaterial({ color: 0xc8b898 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -1;
+  envScene.add(ground);
+
+  // Lighting for the env scene
+  envScene.add(new THREE.AmbientLight(0xffd9a0, 0.4));
+  const envSun = new THREE.DirectionalLight(0xfff0d0, 1.0);
+  envSun.position.set(8, 18, 5);
+  envScene.add(envSun);
+
+  const envMap = pmremGen.fromScene(envScene, 0.04).texture;
+  pmremGen.dispose();
+
+  return envMap;
 }
 
 /* ── Scene ── */
@@ -70,7 +101,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.75;
+renderer.toneMappingExposure = 0.85;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 /* ── Post-processing ── */
@@ -85,18 +116,18 @@ export function initPostProcessing() {
 
   // SSAO for ambient occlusion — adds depth to corners and crevices
   const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-  ssaoPass.kernelRadius = 0.5;
-  ssaoPass.minDistance = 0.0005;
-  ssaoPass.maxDistance = 0.08;
+  ssaoPass.kernelRadius = 1.2;
+  ssaoPass.minDistance = 0.0003;
+  ssaoPass.maxDistance = 0.15;
   ssaoPass.output = SSAOPass.OUTPUT.Default;
   composer.addPass(ssaoPass);
 
   // Subtle bloom for lights and emissive materials
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.12,  // strength — very subtle
-    0.4,   // radius
-    0.9    // threshold — only lamps bloom
+    0.18,  // strength — subtle lamp glow
+    0.5,   // radius
+    0.82   // threshold — lamps + bright surfaces bloom
   );
   composer.addPass(bloomPass);
 
@@ -122,15 +153,16 @@ export let sunLight = null;
 export function initLights() {
   // Set sky texture as background
   scene.background = createDesertSkyTexture();
-  // Set environment map for reflections on glass/metal
-  scene.environment = createWarmEnvMap();
+  // Set PMREM environment map for realistic reflections on glass/metal
+  scene.environment = createPMREMEnvMap(renderer);
+  scene.environmentIntensity = 0.6;
 
   // Warm ambient — subtle golden undertone
   const ambient = new THREE.AmbientLight(0xffd9a0, 0.2);
   scene.add(ambient);
 
   // Hemisphere: warm sky dome + sandy ground bounce
-  const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.3);
+  const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.4);
   scene.add(hemi);
 
   // Primary sun — warm white, moderate intensity
@@ -139,15 +171,15 @@ export function initLights() {
   sunLight.castShadow = true;
   // 4096 shadow map for crisp, detailed shadows
   sunLight.shadow.mapSize.set(4096, 4096);
-  sunLight.shadow.camera.left = -22;
-  sunLight.shadow.camera.right = 22;
-  sunLight.shadow.camera.top = 22;
-  sunLight.shadow.camera.bottom = -22;
+  sunLight.shadow.camera.left = -20;
+  sunLight.shadow.camera.right = 20;
+  sunLight.shadow.camera.top = 20;
+  sunLight.shadow.camera.bottom = -20;
   sunLight.shadow.camera.near = 0.5;
   sunLight.shadow.camera.far = 55;
-  sunLight.shadow.bias = -0.0005;
-  sunLight.shadow.normalBias = 0.02;
-  sunLight.shadow.radius = 2.0; // softer penumbra
+  sunLight.shadow.bias = -0.0003;
+  sunLight.shadow.normalBias = 0.03;
+  sunLight.shadow.radius = 3.0; // softer penumbra
   scene.add(sunLight);
 
   // Fill light from below — simulates light bouncing off sand/concrete
@@ -162,11 +194,41 @@ export function initLights() {
   rimLight.position.set(-10, 10, -8);
   scene.add(rimLight);
 
-  // Ground plane — sun-baked sandy concrete
+  // Interior fill light — brightens apartment rooms
+  const interiorFill = new THREE.DirectionalLight(0xfff0d0, 0.35);
+  interiorFill.position.set(4, 12, 8);
+  interiorFill.castShadow = true;
+  interiorFill.shadow.mapSize.set(2048, 2048);
+  interiorFill.shadow.camera.left = -12;
+  interiorFill.shadow.camera.right = 12;
+  interiorFill.shadow.camera.top = 12;
+  interiorFill.shadow.camera.bottom = -12;
+  interiorFill.shadow.camera.near = 0.5;
+  interiorFill.shadow.camera.far = 30;
+  interiorFill.shadow.bias = -0.0003;
+  interiorFill.shadow.normalBias = 0.03;
+  scene.add(interiorFill);
+
+  // Ground plane — sun-baked sandy concrete with texture
+  const groundTex = createProceduralTexture('concrete_rough');
+  const groundMap = groundTex.map.clone();
+  groundMap.repeat.set(30, 30);
+  groundMap.wrapS = THREE.RepeatWrapping;
+  groundMap.wrapT = THREE.RepeatWrapping;
+  groundMap.needsUpdate = true;
+  const groundNormal = groundTex.normalMap.clone();
+  groundNormal.repeat.set(30, 30);
+  groundNormal.wrapS = THREE.RepeatWrapping;
+  groundNormal.wrapT = THREE.RepeatWrapping;
+  groundNormal.needsUpdate = true;
+
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(120, 120),
     new THREE.MeshStandardMaterial({
       color: 0x8a7a5a,
+      map: groundMap,
+      normalMap: groundNormal,
+      normalScale: new THREE.Vector2(0.4, 0.4),
       roughness: 0.95,
       metalness: 0.0,
     })

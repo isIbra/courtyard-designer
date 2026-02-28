@@ -30,6 +30,8 @@
       <button class="tool-btn" id="btn-floor" title="Floor tool (F)">Floor</button>
       <button class="tool-btn" id="btn-stair" title="Stair tool (S)">Stairs</button>
       <button class="tool-btn" id="btn-eraser" title="Eraser (E)">Eraser</button>
+      <button class="tool-btn" id="btn-move" title="Move furniture (C)">Move</button>
+      <button class="tool-btn" id="btn-paint" title="Paint walls (P)">Paint</button>
       <span class="divider"></span>
       <button class="tool-btn" id="btn-save" title="Save">💾</button>
       <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)">↩</button>
@@ -51,6 +53,7 @@
     <!-- Furniture tab -->
     <div class="tab-content active" id="tab-furniture">
       <div class="category-bar" id="category-bar"></div>
+      <div class="source-bar" id="source-bar"></div>
       <div class="furniture-grid" id="furniture-grid"></div>
     </div>
 
@@ -88,6 +91,9 @@
   <!-- Selection info bar -->
   <div id="selection-bar"></div>
 
+  <!-- Paint brush bar -->
+  <div id="paint-bar"></div>
+
   <!-- Box select overlay -->
   <div id="select-rect"></div>
 
@@ -115,6 +121,7 @@
     <span><kbd>Tab</kbd> Panel</span>
     <span><kbd>F</kbd> Floor</span>
     <span><kbd>S</kbd> Stairs</span>
+    <span><kbd>P</kbd> Paint</span>
     <span><kbd>PgUp/Dn</kbd> Floors</span>
   </div>
 

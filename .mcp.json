@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "courtyard-designer": {
+      "command": "node",
+      "args": ["server.js"],
+      "cwd": "mcp"
+    }
+  }
+}

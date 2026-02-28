@@ -20,7 +20,7 @@ const mouse = new THREE.Vector2();
 // ── Highlight helpers ──
 const highlightColor = new THREE.Color(0xc8a96e);
 
-function highlightObj(obj) {
+export function highlightObj(obj) {
   obj.traverse((c) => {
     if (!c.isMesh) return;
     if (!c._selOrigMat) {
@@ -33,7 +33,7 @@ function highlightObj(obj) {
   });
 }
 
-function unhighlightObj(obj) {
+export function unhighlightObj(obj) {
   obj.traverse((c) => {
     if (!c.isMesh || !c._selOrigMat) return;
     c.material.dispose();

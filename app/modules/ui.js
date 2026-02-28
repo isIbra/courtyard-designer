@@ -1,7 +1,7 @@
-import { CATALOG, createMesh, placeItem, removeItem, placed, thumbnails } from './furniture.js';
-import { ROOMS } from './apartment.js';
+import { CATALOG, createMesh, placeItem, removeItem, placed, thumbnails, generateThumbnail } from './furniture.js';
+import { ROOMS, WALL_COLOR_PALETTE, setWallColor, getWallColor, setIndividualWallColor, wallMeshes } from './apartment.js';
 import { setViewMode, viewMode, requestPointerLock, onTopZoom } from './controls.js';
-import { saveState, resetState, autoSave, saveFloorMaterial } from './persistence.js';
+import { saveState, resetState, autoSave, saveFloorMaterial, saveWallColor } from './persistence.js';
 import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
 import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall } from './wall-builder.js';
@@ -9,13 +9,14 @@ import { createProceduralTexture, TEXTURE_TYPES, TEXTURE_NAMES, TEXTURE_SWATCH_C
 import { getCurrentFloor, switchFloor, addFloor, getFloors, getFloorCount, setOnFloorChange, getYBase } from './floor-manager.js';
 import { toggleFloorBuildMode, isFloorBuildMode, onFloorClick, onFloorMouseMove, onFloorSelect, onFloorKeyDown, deselectTile, applyTileTexture, getSelectedTileId, floorTileRecords } from './floor-builder.js';
 import { toggleStairBuildMode, isStairBuildMode, onStairClick, onStairMouseMove, onStairSelect, onStairKeyDown, deselectStair, rotateStairDirection, updateStairVisibility } from './stair-builder.js';
-import { onSelectionClick, onBoxSelectStart, onBoxSelectMove, onBoxSelectEnd, onSelectionKeyDown, clearSelection, getSelected, getSelectedCount } from './selection.js';
+import { onSelectionClick, onBoxSelectStart, onBoxSelectMove, onBoxSelectEnd, onSelectionKeyDown, clearSelection, getSelected, getSelectedCount, highlightObj, unhighlightObj } from './selection.js';
 import { removeWallById, wallMeshMap, addWallFromRecord } from './apartment.js';
 import { wallRecords, deleteSelectedWall, getSelectedWallId } from './wall-builder.js';
 import { removeFloorTile, addFloorTile, floorTileMeshes } from './floor-builder.js';
 import { removeStair, addStair, stairMeshes, stairRecords } from './stair-builder.js';
 import { deleteWall as dbDeleteWall, deleteFloorTile as dbDeleteTile, deleteStair as dbDeleteStair, putWall, putFloorTile, putStair } from './db.js';
 import { undo as historyUndo, redo as historyRedo, pushAction } from './history.js';
+import { attachGizmo, detachGizmo, toggleGizmoMode, isGizmoActive, isDragging, shouldSuppressClick, getAttached, getGizmoMode } from './gizmo.js';
 import * as THREE from 'three';
 
 // ── State ──
@@ -23,7 +24,12 @@ let selectedType = null;
 let ghostMesh = null;
 let selectedObj = null;
 let activeCategory = 'all';
+let activeSources = { kenney: true, ikea: true, polyhaven: true }; // toggle filters for asset sources
+let furnitureSearch = '';
 let eraserMode = false;
+let furnitureMoveMode = false;
+let paintMode = false;
+let activePaintColor = '#EBE0D0';
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -41,39 +47,120 @@ export function toast(msg) {
   }, 2200);
 }
 
-// ── Populate furniture grid ──
+// ── Get source from model path ──
+function getItemSource(item) {
+  if (!item.model) return 'kenney';
+  if (item.model.startsWith('ikea/')) return 'ikea';
+  if (item.model.startsWith('polyhaven/')) return 'polyhaven';
+  return 'kenney';
+}
+
+// ── Populate furniture grid (paginated + lazy thumbnails) ──
+const PAGE_SIZE = 30;
+let currentFilteredItems = [];
+let renderedCount = 0;
+let gridObserver = null;
+
+function getFilteredItems() {
+  let items = activeCategory === 'all'
+    ? CATALOG
+    : CATALOG.filter((c) => c.cat === activeCategory);
+  items = items.filter((c) => activeSources[getItemSource(c)]);
+  if (furnitureSearch) {
+    const q = furnitureSearch.toLowerCase();
+    items = items.filter((c) => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+  }
+  return items;
+}
+
+function renderItemCard(item) {
+  const div = document.createElement('div');
+  div.className = 'furniture-item';
+  if (selectedType === item.id) div.classList.add('selected');
+  div.dataset.id = item.id;
+  const source = getItemSource(item);
+  const sourceLabels = { ikea: '<span class="source-tag ikea">IKEA</span>', polyhaven: '<span class="source-tag polyhaven">PolyHaven</span>', kenney: '<span class="source-tag kenney">Kenney</span>' };
+  const sourceTag = sourceLabels[source] || sourceLabels.kenney;
+  const thumb = thumbnails.get(item.id);
+  if (thumb) {
+    div.innerHTML = `
+      <img class="thumb" src="${thumb}" alt="${item.name}" draggable="false">
+      <div class="name">${item.name}</div>
+      <div class="item-meta"><span class="dims">${item.w}×${item.d}m</span>${sourceTag}</div>
+    `;
+  } else {
+    const catIcons = { bedroom: '🛏️', living: '🛋️', kitchen: '🍽️', bathroom: '🚿', office: '🖥️', outdoor: '🌿' };
+    const icon = item.icon || catIcons[item.cat] || '📦';
+    div.innerHTML = `
+      <div class="icon">${icon}</div>
+      <div class="name">${item.name}</div>
+      <div class="item-meta"><span class="dims">${item.w}×${item.d}m</span>${sourceTag}</div>
+    `;
+    // Lazy-load thumbnail
+    generateThumbnail(item.id).then(url => {
+      if (url && div.isConnected) {
+        const iconEl = div.querySelector('.icon');
+        if (iconEl) {
+          const img = document.createElement('img');
+          img.className = 'thumb';
+          img.src = url;
+          img.alt = item.name;
+          img.draggable = false;
+          iconEl.replaceWith(img);
+        }
+      }
+    });
+  }
+  div.addEventListener('click', () => selectFurniture(item.id));
+  return div;
+}
+
+function renderNextPage() {
+  const grid = document.getElementById('furniture-grid');
+  const end = Math.min(renderedCount + PAGE_SIZE, currentFilteredItems.length);
+  for (let i = renderedCount; i < end; i++) {
+    grid.appendChild(renderItemCard(currentFilteredItems[i]));
+  }
+  renderedCount = end;
+
+  // Update or remove sentinel
+  let sentinel = document.getElementById('grid-sentinel');
+  if (renderedCount < currentFilteredItems.length) {
+    if (!sentinel) {
+      sentinel = document.createElement('div');
+      sentinel.id = 'grid-sentinel';
+      sentinel.style.height = '1px';
+    }
+    grid.appendChild(sentinel);
+    observeSentinel(sentinel);
+  } else if (sentinel) {
+    sentinel.remove();
+  }
+}
+
+function observeSentinel(sentinel) {
+  if (gridObserver) gridObserver.disconnect();
+  gridObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) {
+      gridObserver.disconnect();
+      renderNextPage();
+    }
+  }, { root: document.getElementById('tab-furniture'), threshold: 0 });
+  gridObserver.observe(sentinel);
+}
+
 function buildFurnitureGrid() {
   const grid = document.getElementById('furniture-grid');
   grid.innerHTML = '';
+  if (gridObserver) { gridObserver.disconnect(); gridObserver = null; }
 
-  const items = activeCategory === 'all'
-    ? CATALOG
-    : CATALOG.filter((c) => c.cat === activeCategory);
+  currentFilteredItems = getFilteredItems();
+  renderedCount = 0;
 
-  for (const item of items) {
-    const div = document.createElement('div');
-    div.className = 'furniture-item';
-    if (selectedType === item.id) div.classList.add('selected');
-    div.dataset.id = item.id;
-    const thumb = thumbnails.get(item.id);
-    if (thumb) {
-      div.innerHTML = `
-        <img class="thumb" src="${thumb}" alt="${item.name}" draggable="false">
-        <div class="name">${item.name}</div>
-        <div class="dims">${item.w}×${item.d}m</div>
-      `;
-    } else {
-      const catIcons = { bedroom: '🛏️', living: '🛋️', kitchen: '🍽️', bathroom: '🚿', office: '🖥️', outdoor: '🌿' };
-      const icon = item.icon || catIcons[item.cat] || '📦';
-      div.innerHTML = `
-        <div class="icon">${icon}</div>
-        <div class="name">${item.name}</div>
-        <div class="dims">${item.w}×${item.d}m</div>
-      `;
-    }
-    div.addEventListener('click', () => selectFurniture(item.id));
-    grid.appendChild(div);
-  }
+  const countEl = document.getElementById('furniture-count');
+  if (countEl) countEl.textContent = `${currentFilteredItems.length} items`;
+
+  renderNextPage();
 }
 
 // ── Category bar ──
@@ -93,6 +180,61 @@ function buildCategoryBar() {
     });
     bar.appendChild(btn);
   }
+}
+
+// ── Source filter bar + search ──
+function buildSourceBar() {
+  const container = document.getElementById('source-bar');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // Search input
+  const search = document.createElement('input');
+  search.type = 'text';
+  search.className = 'furniture-search';
+  search.placeholder = 'Search...';
+  search.value = furnitureSearch;
+  search.addEventListener('input', (e) => {
+    furnitureSearch = e.target.value.trim();
+    buildFurnitureGrid();
+  });
+  container.appendChild(search);
+
+  // Source toggles row
+  const toggleRow = document.createElement('div');
+  toggleRow.className = 'source-toggles';
+
+  const sources = [
+    { key: 'ikea', label: 'IKEA', desc: 'Realistic PBR' },
+    { key: 'polyhaven', label: 'PolyHaven', desc: 'CC0 PBR' },
+    { key: 'kenney', label: 'Kenney', desc: 'Low-poly CC0' },
+  ];
+
+  for (const src of sources) {
+    const btn = document.createElement('button');
+    btn.className = 'source-toggle' + (activeSources[src.key] ? ' active' : '');
+    btn.innerHTML = `<span class="source-name">${src.label}</span><span class="source-desc">${src.desc}</span>`;
+    btn.title = `Toggle ${src.label} assets`;
+    btn.addEventListener('click', () => {
+      activeSources[src.key] = !activeSources[src.key];
+      // Ensure at least one source is active
+      if (!activeSources.ikea && !activeSources.kenney && !activeSources.polyhaven) {
+        activeSources[src.key] = true;
+        return;
+      }
+      btn.classList.toggle('active', activeSources[src.key]);
+      buildFurnitureGrid();
+    });
+    toggleRow.appendChild(btn);
+  }
+
+  container.appendChild(toggleRow);
+
+  // Item count
+  const count = document.createElement('span');
+  count.className = 'furniture-count';
+  count.id = 'furniture-count';
+  container.appendChild(count);
 }
 
 // ── Room list ──
@@ -120,6 +262,25 @@ function buildRoomList() {
 // ── Material panel with texture swatches ──
 function buildMaterialPanel() {
   const panel = document.getElementById('material-panel');
+
+  // Paint Brush toggle button at top
+  const paintBtnWrap = document.createElement('div');
+  paintBtnWrap.style.marginBottom = '12px';
+  const paintToggle = document.createElement('button');
+  paintToggle.className = 'tool-btn';
+  paintToggle.id = 'btn-paint-panel';
+  paintToggle.textContent = 'Paint Brush (P)';
+  paintToggle.style.width = '100%';
+  paintToggle.addEventListener('click', () => {
+    const on = togglePaintMode();
+    toast(on ? 'Paint mode ON — click walls to paint' : 'Paint mode OFF');
+    paintToggle.classList.toggle('active', on);
+    const toolbarPaintBtn = document.getElementById('btn-paint');
+    if (toolbarPaintBtn) toolbarPaintBtn.classList.toggle('active', on);
+  });
+  paintBtnWrap.appendChild(paintToggle);
+  panel.appendChild(paintBtnWrap);
+
   const allRooms = [...ROOMS, { id: 'courtyard', name: 'Courtyard' }];
 
   const floorTextures = TEXTURE_TYPES.filter(t => t !== 'plaster');
@@ -207,7 +368,112 @@ function buildMaterialPanel() {
       floorRow.appendChild(swatch);
     }
     section.appendChild(floorRow);
+
+    // Wall color row (only for rooms with walls, not courtyard)
+    if (room.id !== 'courtyard') {
+      const wallLabel = document.createElement('div');
+      wallLabel.className = 'mat-label';
+      wallLabel.textContent = 'Wall Color';
+      section.appendChild(wallLabel);
+
+      const wallRow = document.createElement('div');
+      wallRow.className = 'swatch-row';
+
+      const currentColor = getWallColor(room.id);
+
+      for (const preset of WALL_COLOR_PALETTE) {
+        const swatch = document.createElement('div');
+        swatch.className = 'wall-swatch';
+        swatch.style.background = preset.hex;
+        swatch.title = preset.name;
+        if (currentColor.toLowerCase() === preset.hex.toLowerCase()) swatch.classList.add('active');
+        swatch.addEventListener('click', () => {
+          setWallColor(room.id, preset.hex);
+          saveWallColor(room.id, preset.hex);
+          autoSave();
+          wallRow.querySelectorAll('.wall-swatch').forEach(s => s.classList.remove('active'));
+          swatch.classList.add('active');
+          // Sync the color picker
+          const picker = wallRow.querySelector('.wall-color-picker');
+          if (picker) picker.value = preset.hex;
+        });
+        wallRow.appendChild(swatch);
+      }
+
+      // Native color picker at end
+      const picker = document.createElement('input');
+      picker.type = 'color';
+      picker.className = 'wall-color-picker';
+      picker.value = currentColor;
+      picker.title = 'Custom color';
+      picker.addEventListener('input', (e) => {
+        setWallColor(room.id, e.target.value);
+        wallRow.querySelectorAll('.wall-swatch').forEach(s => s.classList.remove('active'));
+      });
+      picker.addEventListener('change', (e) => {
+        saveWallColor(room.id, e.target.value);
+        autoSave();
+      });
+      wallRow.appendChild(picker);
+
+      section.appendChild(wallRow);
+    }
+
     panel.appendChild(section);
+  }
+
+  // ── Custom Walls section (non-seed walls) ──
+  const customWalls = [...wallRecords.values()].filter(rec => !rec.isSeed);
+  if (customWalls.length > 0) {
+    const cwSection = document.createElement('div');
+    cwSection.className = 'mat-section';
+    cwSection.innerHTML = `<div class="mat-section-title">Custom Walls</div>`;
+
+    for (const rec of customWalls) {
+      const label = document.createElement('div');
+      label.className = 'mat-label';
+      label.textContent = `Wall ${rec.id.slice(0, 8)} (${rec.type === 'h' ? 'horizontal' : 'vertical'})`;
+      cwSection.appendChild(label);
+
+      const wallRow = document.createElement('div');
+      wallRow.className = 'swatch-row';
+
+      const mesh = wallMeshMap.get(rec.id);
+      const currentColor = mesh?.userData.customColor || '#EBE0D0';
+
+      for (const preset of WALL_COLOR_PALETTE) {
+        const swatch = document.createElement('div');
+        swatch.className = 'wall-swatch';
+        swatch.style.background = preset.hex;
+        swatch.title = preset.name;
+        if (currentColor.toLowerCase() === preset.hex.toLowerCase()) swatch.classList.add('active');
+        swatch.addEventListener('click', () => {
+          setIndividualWallColor(rec.id, preset.hex);
+          autoSave();
+          wallRow.querySelectorAll('.wall-swatch').forEach(s => s.classList.remove('active'));
+          swatch.classList.add('active');
+          const picker = wallRow.querySelector('.wall-color-picker');
+          if (picker) picker.value = preset.hex;
+        });
+        wallRow.appendChild(swatch);
+      }
+
+      const picker = document.createElement('input');
+      picker.type = 'color';
+      picker.className = 'wall-color-picker';
+      picker.value = currentColor;
+      picker.title = 'Custom color';
+      picker.addEventListener('input', (e) => {
+        setIndividualWallColor(rec.id, e.target.value);
+        wallRow.querySelectorAll('.wall-swatch').forEach(s => s.classList.remove('active'));
+      });
+      picker.addEventListener('change', () => { autoSave(); });
+      wallRow.appendChild(picker);
+
+      cwSection.appendChild(wallRow);
+    }
+
+    panel.appendChild(cwSection);
   }
 }
 
@@ -273,6 +539,8 @@ function deactivateAllBuildModes() {
 function selectFurniture(id) {
   deactivateAllBuildModes();
   deactivateEraser();
+  deactivateFurnitureMoveMode();
+  deactivatePaintMode();
 
   if (selectedType === id) {
     selectedType = null;
@@ -293,9 +561,11 @@ function selectFurniture(id) {
 // ── Deselect all ──
 function deselectAll() {
   selectedType = null;
-  selectedObj = null;
+  if (selectedObj) { unhighlightObj(selectedObj); selectedObj = null; }
   if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
+  detachGizmo();
   deactivateEraser();
+  deactivateFurnitureMoveMode();
   deselectWall();
   deselectTile();
   deselectStair();
@@ -418,6 +688,7 @@ function toggleEraserMode() {
   eraserMode = !eraserMode;
   if (eraserMode) {
     deactivateAllBuildModes();
+    deactivateFurnitureMoveMode();
     selectedType = null;
     if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
     buildFurnitureGrid();
@@ -434,6 +705,205 @@ function deactivateEraser() {
   const btn = document.getElementById('btn-eraser');
   if (btn) btn.classList.remove('active');
   renderer.domElement.style.cursor = '';
+}
+
+// ── Furniture move mode (C key) ──
+function toggleFurnitureMoveMode() {
+  furnitureMoveMode = !furnitureMoveMode;
+  if (furnitureMoveMode) {
+    deactivateAllBuildModes();
+    deactivateEraser();
+    selectedType = null;
+    if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
+    buildFurnitureGrid();
+  } else {
+    // Exiting — detach gizmo and clean up
+    detachGizmo();
+    if (selectedObj) { unhighlightObj(selectedObj); selectedObj = null; }
+    document.getElementById('selection-bar').style.display = 'none';
+  }
+  const btn = document.getElementById('btn-move');
+  if (btn) btn.classList.toggle('active', furnitureMoveMode);
+  renderer.domElement.style.cursor = furnitureMoveMode ? 'pointer' : '';
+  return furnitureMoveMode;
+}
+
+function deactivateFurnitureMoveMode() {
+  if (!furnitureMoveMode) return;
+  furnitureMoveMode = false;
+  detachGizmo();
+  if (selectedObj) { unhighlightObj(selectedObj); selectedObj = null; }
+  document.getElementById('selection-bar').style.display = 'none';
+  const btn = document.getElementById('btn-move');
+  if (btn) btn.classList.remove('active');
+  renderer.domElement.style.cursor = '';
+}
+
+// ── Paint brush mode (P key) ──
+function togglePaintMode() {
+  paintMode = !paintMode;
+  if (paintMode) {
+    deactivateAllBuildModes();
+    deactivateEraser();
+    deactivateFurnitureMoveMode();
+    selectedType = null;
+    if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
+    buildFurnitureGrid();
+  }
+  const bar = document.getElementById('paint-bar');
+  if (bar) bar.style.display = paintMode ? 'flex' : 'none';
+  renderer.domElement.style.cursor = paintMode ? 'crosshair' : '';
+  return paintMode;
+}
+
+function deactivatePaintMode() {
+  if (!paintMode) return;
+  paintMode = false;
+  const bar = document.getElementById('paint-bar');
+  if (bar) bar.style.display = 'none';
+  renderer.domElement.style.cursor = '';
+}
+
+function onPaintClick(event) {
+  const vp = renderer.domElement;
+  const rect = vp.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const hits = raycaster.intersectObjects(wallMeshes);
+  if (hits.length === 0) return;
+
+  const wallMesh = hits[0].object;
+  const wallId = wallMesh.userData.wallId;
+  if (!wallId) return;
+
+  setIndividualWallColor(wallId, activePaintColor);
+  autoSave();
+}
+
+function onPaintRightClick(event) {
+  event.preventDefault();
+  const vp = renderer.domElement;
+  const rect = vp.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const hits = raycaster.intersectObjects(wallMeshes);
+  if (hits.length === 0) return;
+
+  const wallMesh = hits[0].object;
+  const color = '#' + wallMesh.material.color.getHexString();
+  activePaintColor = color;
+  // Update paint bar swatches
+  updatePaintBarActive();
+  toast(`Picked color: ${color}`);
+}
+
+function updatePaintBarActive() {
+  const bar = document.getElementById('paint-bar');
+  if (!bar) return;
+  bar.querySelectorAll('.wall-swatch').forEach((s) => {
+    s.classList.toggle('active', s.dataset.hex && s.dataset.hex.toLowerCase() === activePaintColor.toLowerCase());
+  });
+  const picker = bar.querySelector('.wall-color-picker');
+  if (picker) picker.value = activePaintColor;
+}
+
+function buildPaintBar() {
+  const bar = document.getElementById('paint-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const label = document.createElement('span');
+  label.className = 'paint-bar-label';
+  label.textContent = 'Paint:';
+  bar.appendChild(label);
+
+  for (const preset of WALL_COLOR_PALETTE) {
+    const swatch = document.createElement('div');
+    swatch.className = 'wall-swatch';
+    swatch.style.background = preset.hex;
+    swatch.title = preset.name;
+    swatch.dataset.hex = preset.hex;
+    if (activePaintColor.toLowerCase() === preset.hex.toLowerCase()) swatch.classList.add('active');
+    swatch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      activePaintColor = preset.hex;
+      updatePaintBarActive();
+    });
+    bar.appendChild(swatch);
+  }
+
+  const picker = document.createElement('input');
+  picker.type = 'color';
+  picker.className = 'wall-color-picker';
+  picker.value = activePaintColor;
+  picker.title = 'Custom color';
+  picker.addEventListener('input', (e) => {
+    e.stopPropagation();
+    activePaintColor = e.target.value;
+    bar.querySelectorAll('.wall-swatch').forEach((s) => s.classList.remove('active'));
+  });
+  bar.appendChild(picker);
+
+  const hint = document.createElement('span');
+  hint.className = 'paint-bar-hint';
+  hint.textContent = '[Esc] exit  |  Right-click = eyedropper';
+  bar.appendChild(hint);
+}
+
+function onFurnitureMoveClick(event) {
+  // Ignore clicks while dragging or just after a drag (prevents gizmo detach)
+  if (shouldSuppressClick()) return;
+
+  const vp = renderer.domElement;
+  const rect = vp.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const meshes = placed.flatMap((g) => {
+    const children = [];
+    g.traverse((c) => { if (c.isMesh) children.push(c); });
+    return children;
+  });
+
+  const hits = raycaster.intersectObjects(meshes);
+  if (hits.length > 0) {
+    let obj = hits[0].object;
+    while (obj.parent && !obj.userData.furnitureId) obj = obj.parent;
+    if (obj.userData.furnitureId) {
+      // If clicking a different piece, switch to it
+      if (selectedObj && selectedObj !== obj) unhighlightObj(selectedObj);
+      selectedObj = obj;
+      highlightObj(obj);
+      attachGizmo(obj);
+      updateMoveSelectionBar();
+    }
+  } else {
+    // Clicked empty space — detach gizmo, deselect, stay in move mode
+    detachGizmo();
+    if (selectedObj) unhighlightObj(selectedObj);
+    selectedObj = null;
+    document.getElementById('selection-bar').style.display = 'none';
+  }
+}
+
+function updateMoveSelectionBar() {
+  if (!selectedObj) return;
+  const bar = document.getElementById('selection-bar');
+  const name = selectedObj.userData.item?.name || selectedObj.userData.furnitureId;
+  const mode = getGizmoMode();
+  if (mode === 'translate') {
+    bar.textContent = `${name} \u2014 drag to MOVE  [R] rotate  [Del] remove  [Esc] deselect`;
+  } else if (mode === 'rotate') {
+    bar.textContent = `${name} \u2014 drag to ROTATE  [R] scale  [Del] remove  [Esc] deselect`;
+  } else {
+    bar.textContent = `${name} \u2014 drag to SCALE  [R] move  [Del] remove  [Esc] deselect`;
+  }
+  bar.style.display = 'block';
 }
 
 function onEraserClick(event) {
@@ -564,10 +1034,12 @@ function onEraserClick(event) {
 // ── Init all UI ──
 export function initUI() {
   buildCategoryBar();
+  buildSourceBar();
   buildFurnitureGrid();
   buildRoomList();
   buildMaterialPanel();
   buildFloorSwitcher();
+  buildPaintBar();
 
   // Floor change callback
   setOnFloorChange((level) => {
@@ -608,6 +1080,7 @@ export function initUI() {
   if (wallBtn) {
     wallBtn.addEventListener('click', () => {
       deactivateEraser();
+      deactivateFurnitureMoveMode();
       if (isFloorBuildMode()) toggleFloorBuildMode();
       if (isStairBuildMode()) toggleStairBuildMode();
       const on = toggleWallBuildMode();
@@ -626,6 +1099,7 @@ export function initUI() {
   if (floorBtn) {
     floorBtn.addEventListener('click', () => {
       deactivateEraser();
+      deactivateFurnitureMoveMode();
       if (isBuildMode()) toggleWallBuildMode();
       if (isStairBuildMode()) toggleStairBuildMode();
       const on = toggleFloorBuildMode();
@@ -644,6 +1118,7 @@ export function initUI() {
   if (stairBtn) {
     stairBtn.addEventListener('click', () => {
       deactivateEraser();
+      deactivateFurnitureMoveMode();
       if (isBuildMode()) toggleWallBuildMode();
       if (isFloorBuildMode()) toggleFloorBuildMode();
       const on = toggleStairBuildMode();
@@ -663,6 +1138,26 @@ export function initUI() {
     eraserBtn.addEventListener('click', () => {
       const on = toggleEraserMode();
       toast(on ? 'Eraser ON' : 'Eraser OFF');
+    });
+  }
+
+  // Move tool button
+  const moveBtn = document.getElementById('btn-move');
+  if (moveBtn) {
+    moveBtn.addEventListener('click', () => {
+      deactivatePaintMode();
+      const on = toggleFurnitureMoveMode();
+      toast(on ? 'Move mode ON — click furniture to move' : 'Move mode OFF');
+    });
+  }
+
+  // Paint tool button
+  const paintBtn = document.getElementById('btn-paint');
+  if (paintBtn) {
+    paintBtn.addEventListener('click', () => {
+      const on = togglePaintMode();
+      toast(on ? 'Paint mode ON — click walls to paint' : 'Paint mode OFF');
+      paintBtn.classList.toggle('active', on);
     });
   }
 
@@ -704,6 +1199,12 @@ export function initUI() {
   vp.addEventListener('click', (e) => {
     if (viewMode === 'walk') {
       requestPointerLock();
+      return;
+    }
+
+    // Paint brush mode
+    if (paintMode) {
+      onPaintClick(e);
       return;
     }
 
@@ -762,6 +1263,12 @@ export function initUI() {
       return;
     }
 
+    // ── Furniture move mode (C key) ──
+    if (furnitureMoveMode) {
+      onFurnitureMoveClick(e);
+      return;
+    }
+
     // Floor tile selection
     if (onFloorSelect(e)) return;
 
@@ -771,39 +1278,22 @@ export function initUI() {
     // Wall selection
     if (onWallSelect(e)) return;
 
-    // Select placed furniture object
-    const rect = vp.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-
-    const meshes = placed.flatMap((g) => {
-      const children = [];
-      g.traverse((c) => { if (c.isMesh) children.push(c); });
-      return children;
-    });
-
-    const hits = raycaster.intersectObjects(meshes);
-    if (hits.length > 0) {
-      let obj = hits[0].object;
-      while (obj.parent && !obj.userData.furnitureId) obj = obj.parent;
-      if (obj.userData.furnitureId) {
-        selectedObj = obj;
-        const bar = document.getElementById('selection-bar');
-        bar.textContent = `${obj.userData.furnitureId} — [R] rotate  [Del] remove`;
-        bar.style.display = 'block';
-      }
-    } else {
-      selectedObj = null;
-      deselectWall();
-      deselectTile();
-      deselectStair();
-      document.getElementById('selection-bar').style.display = 'none';
-    }
+    // Click on empty space — deselect all
+    if (selectedObj) unhighlightObj(selectedObj);
+    selectedObj = null;
+    deselectWall();
+    deselectTile();
+    deselectStair();
+    document.getElementById('selection-bar').style.display = 'none';
   });
 
   vp.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    // Paint brush eyedropper
+    if (paintMode) {
+      onPaintRightClick(e);
+      return;
+    }
     if (ghostMesh) ghostMesh.rotation.y += Math.PI / 4;
     if (selectedObj) {
       selectedObj.rotation.y += Math.PI / 4;
@@ -824,7 +1314,7 @@ export function initUI() {
     // Stair builder ghost preview
     onStairMouseMove(e);
 
-    // Furniture ghost preview
+    // Furniture ghost preview (new placement)
     if (ghostMesh && selectedType) {
       const pt = getFloorHit(e);
       if (pt) {
@@ -898,6 +1388,8 @@ export function initUI() {
     // F toggles floor build mode (only when not in walk mode)
     if (e.key === 'f' && viewMode !== 'walk') {
       deactivateEraser();
+      deactivateFurnitureMoveMode();
+      deactivatePaintMode();
       if (isBuildMode()) toggleWallBuildMode();
       if (isStairBuildMode()) toggleStairBuildMode();
       const on = toggleFloorBuildMode();
@@ -914,6 +1406,8 @@ export function initUI() {
     // S toggles stair build mode (only when not in walk mode)
     if ((e.key === 's' || e.key === 'S') && viewMode !== 'walk') {
       deactivateEraser();
+      deactivateFurnitureMoveMode();
+      deactivatePaintMode();
       if (isBuildMode()) toggleWallBuildMode();
       if (isFloorBuildMode()) toggleFloorBuildMode();
       const on = toggleStairBuildMode();
@@ -930,6 +1424,8 @@ export function initUI() {
     // W toggles wall mode (only when not in walk mode)
     if ((e.key === 'w' || e.key === 'W') && viewMode !== 'walk') {
       deactivateEraser();
+      deactivateFurnitureMoveMode();
+      deactivatePaintMode();
       if (isFloorBuildMode()) toggleFloorBuildMode();
       if (isStairBuildMode()) toggleStairBuildMode();
       const on = toggleWallBuildMode();
@@ -946,15 +1442,49 @@ export function initUI() {
     // E toggles eraser mode (only when not in walk mode)
     if ((e.key === 'e' || e.key === 'E') && viewMode !== 'walk') {
       deactivateAllBuildModes();
+      deactivateFurnitureMoveMode();
+      deactivatePaintMode();
       const on = toggleEraserMode();
       toast(on ? 'Eraser ON' : 'Eraser OFF');
+      return;
+    }
+
+    // C toggles furniture move mode (only when not in walk mode)
+    if ((e.key === 'c' || e.key === 'C') && viewMode !== 'walk') {
+      deactivateAllBuildModes();
+      deactivateEraser();
+      deactivatePaintMode();
+      const on = toggleFurnitureMoveMode();
+      toast(on ? 'Move mode ON — click furniture to move' : 'Move mode OFF');
+      return;
+    }
+
+    // P toggles paint brush mode (only when not in walk mode)
+    if ((e.key === 'p' || e.key === 'P') && viewMode !== 'walk') {
+      const on = togglePaintMode();
+      toast(on ? 'Paint mode ON — click walls to paint' : 'Paint mode OFF');
       return;
     }
 
     // Wall builder key handlers (Escape, Delete)
     if (onWallKeyDown(e.key)) return;
 
-    if (e.key === 'Escape') deselectAll();
+    if (e.key === 'Escape') {
+      // Paint mode: exit paint mode
+      if (paintMode) {
+        deactivatePaintMode();
+        toast('Paint mode OFF');
+        return;
+      }
+      // In move mode with gizmo active: just detach gizmo, stay in move mode
+      if (furnitureMoveMode && isGizmoActive()) {
+        detachGizmo();
+        if (selectedObj) { unhighlightObj(selectedObj); selectedObj = null; }
+        document.getElementById('selection-bar').style.display = 'none';
+        return;
+      }
+      deselectAll();
+    }
 
     // R: rotate furniture/ghost, or rotate stair direction
     if (e.key === 'r' || e.key === 'R') {
@@ -964,7 +1494,12 @@ export function initUI() {
         return;
       }
       if (ghostMesh) ghostMesh.rotation.y += Math.PI / 4;
-      if (selectedObj) {
+      if (furnitureMoveMode && isGizmoActive()) {
+        toggleGizmoMode();
+        updateMoveSelectionBar();
+        return;
+      }
+      if (selectedObj && !furnitureMoveMode) {
         selectedObj.rotation.y += Math.PI / 4;
         autoSave();
       }
@@ -977,11 +1512,15 @@ export function initUI() {
         const savedZ = selectedObj.position.z;
         const savedRotY = selectedObj.rotation.y;
         const savedFloor = selectedObj.userData.floor || 0;
+        const savedY = selectedObj.position.y;
+        const savedScale = selectedObj.userData.customScale ? selectedObj.userData.customScale.clone() : null;
+        detachGizmo();
         removeItem(selectedObj);
         pushAction({
           label: 'Delete furniture',
           undo() {
-            placeItem(savedId, savedX, savedZ, savedRotY, savedFloor);
+            placeItem(savedId, savedX, savedZ, savedRotY, savedFloor, savedY,
+              savedScale ? { x: savedScale.x, y: savedScale.y, z: savedScale.z } : null);
           },
           redo() {
             const found = placed.find(p => p.userData.furnitureId === savedId &&

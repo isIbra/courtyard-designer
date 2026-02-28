@@ -7,7 +7,7 @@ import { stairRecords } from './stair-builder.js';
 
 // ── State ──
 export let viewMode = 'orbit';
-let orbitControls = null;
+export let orbitControls = null;
 
 // Walk state
 const walkState = {

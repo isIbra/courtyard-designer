@@ -52,8 +52,19 @@ function valueNoise(ctx, w, h, scale, alpha, color) {
   ctx.putImageData(imgData, 0, 0);
 }
 
+/** Multi-octave value noise for richer texture detail */
+function multiOctaveNoise(ctx, w, h, baseScale, alpha, color, octaves = 3) {
+  let amp = alpha;
+  let scale = baseScale;
+  for (let o = 0; o < octaves; o++) {
+    valueNoise(ctx, w, h, scale, amp, color);
+    scale *= 0.5;
+    amp *= 0.5;
+  }
+}
+
 /** Generate normal map from heightmap canvas (Sobel) */
-function generateNormalFromHeight(srcCanvas) {
+function generateNormalFromHeight(srcCanvas, strength = 3.5) {
   const w = srcCanvas.width;
   const h = srcCanvas.height;
   const srcCtx = srcCanvas.getContext('2d');
@@ -73,7 +84,6 @@ function generateNormalFromHeight(srcCanvas) {
     return (srcData[i] * 0.299 + srcData[i + 1] * 0.587 + srcData[i + 2] * 0.114) / 255;
   }
 
-  const strength = 2.0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const tl = lum(x - 1, y - 1);
@@ -135,6 +145,28 @@ function drawWoodPlanks(ctx, w, h, baseR, baseG, baseB, plankH, grainDensity) {
       ctx.stroke();
     }
 
+    // Micro-variation dots between grain lines
+    for (let d = 0; d < grainDensity * 3; d++) {
+      const dx = rand() * w;
+      const dy = y + rand() * plankH;
+      ctx.fillStyle = `rgba(0,0,0,${0.02 + rand() * 0.06})`;
+      ctx.fillRect(dx, dy, 1 + rand(), 1 + rand());
+    }
+
+    // Occasional knot hole (1 in 4 planks)
+    if (rand() > 0.75) {
+      const kx = 50 + rand() * (w - 100);
+      const ky = y + plankH * 0.3 + rand() * plankH * 0.4;
+      const kr = 3 + rand() * 5;
+      const kGrad = ctx.createRadialGradient(kx, ky, 0, kx, ky, kr);
+      kGrad.addColorStop(0, `rgba(${Math.max(0, baseR - 50)},${Math.max(0, baseG - 50)},${Math.max(0, baseB - 40)},0.6)`);
+      kGrad.addColorStop(1, `rgba(${baseR},${baseG},${baseB},0)`);
+      ctx.fillStyle = kGrad;
+      ctx.beginPath();
+      ctx.ellipse(kx, ky, kr, kr * 0.6, rand() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Gap between planks
     ctx.fillStyle = `rgba(0,0,0,0.3)`;
     ctx.fillRect(0, y + plankH - 1, w, 1);
@@ -174,8 +206,8 @@ function drawMarble(ctx, w, h, baseR, baseG, baseB, veinColor) {
   ctx.fillStyle = `rgb(${baseR},${baseG},${baseB})`;
   ctx.fillRect(0, 0, w, h);
 
-  // Subtle base variation
-  valueNoise(ctx, w, h, 80, 0.15, '#808080');
+  // Rich multi-octave noise for marble depth
+  multiOctaveNoise(ctx, w, h, 80, 0.15, '#808080', 3);
 
   // Veins using layered sine curves
   const rand = seededRandom(baseR * 7 + baseG);
@@ -316,7 +348,7 @@ function drawStone(ctx, w, h, baseR, baseG, baseB, style) {
   ctx.fillStyle = `rgb(${baseR},${baseG},${baseB})`;
   ctx.fillRect(0, 0, w, h);
 
-  valueNoise(ctx, w, h, 40, 0.2, '#606050');
+  multiOctaveNoise(ctx, w, h, 40, 0.2, '#606050', 3);
 
   // Vein patterns
   const rand = seededRandom(baseR * 3 + baseB);
@@ -348,6 +380,9 @@ function drawConcreteEpoxy(ctx, w, h) {
   // Base: medium gray concrete
   ctx.fillStyle = '#9A9590';
   ctx.fillRect(0, 0, w, h);
+
+  // Multi-octave base variation
+  multiOctaveNoise(ctx, w, h, 60, 0.08, '#A0A0B0', 3);
 
   // Subtle aggregate speckles beneath the epoxy
   const rand = seededRandom(8888);
@@ -404,7 +439,9 @@ function drawPlaster(ctx, w, h) {
 // ── Canvas generator dispatch ──
 
 function generateTextureCanvas(type) {
-  const size = 512;
+  // 1024 for floors (wood, marble, tile, stone, concrete, epoxy), 512 for walls/ceilings
+  const isFloorType = !type.startsWith('plaster');
+  const size = isFloorType ? 1024 : 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -498,7 +535,18 @@ export function createProceduralTexture(type) {
   else if (type.startsWith('stone')) roughness = 0.7;
   else if (type === 'plaster') roughness = 0.92;
 
-  const result = { map, normalMap, roughness };
+  // Recommended normalScale per type
+  let normalScale = 0.3;
+  if (type.startsWith('marble')) normalScale = 0.15;
+  else if (type.startsWith('wood')) normalScale = 0.4;
+  else if (type.startsWith('tile')) normalScale = 0.5;
+  else if (type === 'concrete_smooth') normalScale = 0.4;
+  else if (type === 'concrete_rough') normalScale = 0.6;
+  else if (type === 'concrete_epoxy') normalScale = 0.3;
+  else if (type.startsWith('stone')) normalScale = 0.5;
+  else if (type === 'plaster') normalScale = 0.2;
+
+  const result = { map, normalMap, roughness, normalScale };
   cache.set(type, result);
   return result;
 }

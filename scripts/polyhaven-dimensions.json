@@ -1,0 +1,764 @@
+{
+  "ArmChair_01": {
+    "w": 0.85,
+    "h": 1.07,
+    "d": 0.77,
+    "name": "Arm Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "BarberShopChair_01": {
+    "w": 0.76,
+    "h": 1.49,
+    "d": 1.33,
+    "name": "Barber Shop Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "ClassicConsole_01": {
+    "w": 1.54,
+    "h": 0.95,
+    "d": 0.59,
+    "name": "Classic Console 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "ClassicNightstand_01": {
+    "w": 0.57,
+    "h": 0.7,
+    "d": 0.42,
+    "name": "Classic Nightstand 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "CoffeeCart_01": {
+    "w": 2.17,
+    "h": 1.72,
+    "d": 1.07,
+    "name": "Coffee Cart 01",
+    "categories": [
+      "appliances",
+      "props",
+      "furniture",
+      "office"
+    ]
+  },
+  "CoffeeTable_01": {
+    "w": 1.54,
+    "h": 0.52,
+    "d": 0.97,
+    "name": "Coffee Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "GothicBed_01": {
+    "w": 1.49,
+    "h": 1.53,
+    "d": 2.04,
+    "name": "Gothic Bed 01",
+    "categories": [
+      "furniture",
+      "bed"
+    ]
+  },
+  "GothicCabinet_01": {
+    "w": 1.72,
+    "h": 2.81,
+    "d": 1.02,
+    "name": "Gothic Cabinet 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "GothicCommode_01": {
+    "w": 1.2,
+    "h": 1.34,
+    "d": 0.84,
+    "name": "Gothic Commode 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "GreenChair_01": {
+    "w": 0.67,
+    "h": 1.06,
+    "d": 0.66,
+    "name": "Green Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "Ottoman_01": {
+    "w": 0.88,
+    "h": 0.62,
+    "d": 0.62,
+    "name": "Ottoman 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "Rockingchair_01": {
+    "w": 0.71,
+    "h": 0.99,
+    "d": 0.83,
+    "name": "Rockingchair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "SchoolChair_01": {
+    "w": 0.57,
+    "h": 1.01,
+    "d": 0.68,
+    "name": "School Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "SchoolDesk_01": {
+    "w": 0.71,
+    "h": 0.88,
+    "d": 0.55,
+    "name": "School Desk 01",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "Shelf_01": {
+    "w": 1,
+    "h": 2.08,
+    "d": 0.26,
+    "name": "Shelf 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "Sofa_01": {
+    "w": 1.57,
+    "h": 0.8,
+    "d": 0.66,
+    "name": "Sofa 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "WoodenChair_01": {
+    "w": 0.69,
+    "h": 2.27,
+    "d": 0.66,
+    "name": "Wooden Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "WoodenTable_01": {
+    "w": 1.8,
+    "h": 0.55,
+    "d": 0.66,
+    "name": "Wooden Table 01",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "WoodenTable_02": {
+    "w": 0.3,
+    "h": 0.42,
+    "d": 0.3,
+    "name": "Wooden Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "WoodenTable_03": {
+    "w": 1.33,
+    "h": 1.2,
+    "d": 0.72,
+    "name": "Wooden Table 03",
+    "categories": [
+      "furniture",
+      "collection: the_shed"
+    ]
+  },
+  "bar_chair_round_01": {
+    "w": 0.49,
+    "h": 0.75,
+    "d": 0.48,
+    "name": "Bar Chair Round 01",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "chinese_armchair": {
+    "w": 0.85,
+    "h": 1.59,
+    "d": 0.79,
+    "name": "Chinese Armchair",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "chinese_cabinet": {
+    "w": 1.26,
+    "h": 3.67,
+    "d": 0.7,
+    "name": "Chinese Cabinet",
+    "categories": [
+      "shelves",
+      "furniture"
+    ]
+  },
+  "chinese_commode": {
+    "w": 4.49,
+    "h": 2.02,
+    "d": 1.17,
+    "name": "Chinese Commode",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "chinese_console_table": {
+    "w": 1.72,
+    "h": 0.66,
+    "d": 0.34,
+    "name": "Chinese Console Table",
+    "categories": [
+      "table",
+      "furniture"
+    ]
+  },
+  "chinese_screen_panels": {
+    "w": 1.29,
+    "h": 1.6,
+    "d": 0.38,
+    "name": "Chinese Screen Panels",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "chinese_sofa": {
+    "w": 2.29,
+    "h": 0.86,
+    "d": 0.97,
+    "name": "Chinese Sofa",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "chinese_stool": {
+    "w": 0.51,
+    "h": 0.63,
+    "d": 0.6,
+    "name": "Chinese Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "chinese_tea_table": {
+    "w": 0.84,
+    "h": 0.5,
+    "d": 0.84,
+    "name": "Chinese Tea Table",
+    "categories": [
+      "table",
+      "furniture"
+    ]
+  },
+  "coffee_table_round_01": {
+    "w": 1.3,
+    "h": 0.49,
+    "d": 1.3,
+    "name": "Coffee Table Round 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "dining_chair_02": {
+    "w": 0.43,
+    "h": 0.97,
+    "d": 0.58,
+    "name": "Dining Chair 02",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "drawer_cabinet": {
+    "w": 1.14,
+    "h": 1.88,
+    "d": 0.49,
+    "name": "Drawer Cabinet",
+    "categories": [
+      "furniture"
+    ]
+  },
+  "folding_wooden_stool": {
+    "w": 0.53,
+    "h": 0.44,
+    "d": 0.55,
+    "name": "Folding Wooden Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "gallinera_chair": {
+    "w": 0.58,
+    "h": 1.03,
+    "d": 0.6,
+    "name": "Gallinera Chair",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "gallinera_table": {
+    "w": 0.83,
+    "h": 0.49,
+    "d": 0.52,
+    "name": "Gallinera Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "gothic_coffee_table": {
+    "w": 1.44,
+    "h": 0.56,
+    "d": 1.44,
+    "name": "Gothic Coffee Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "industrial_coffee_table": {
+    "w": 0.78,
+    "h": 0.76,
+    "d": 0.64,
+    "name": "Industrial Coffee Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "mid_century_lounge_chair": {
+    "w": 1.01,
+    "h": 1.17,
+    "d": 1.19,
+    "name": "Mid Century Lounge Chair",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "modern_arm_chair_01": {
+    "w": 0.82,
+    "h": 1.02,
+    "d": 0.99,
+    "name": "Modern Arm Chair 01",
+    "categories": [
+      "furniture",
+      "seating",
+      "office"
+    ]
+  },
+  "modern_coffee_table_01": {
+    "w": 0.6,
+    "h": 0.39,
+    "d": 1.2,
+    "name": "Modern Coffee Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "modern_coffee_table_02": {
+    "w": 1.2,
+    "h": 0.37,
+    "d": 1.2,
+    "name": "Modern Coffee Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "modern_wooden_cabinet": {
+    "w": 2.44,
+    "h": 0.68,
+    "d": 0.68,
+    "name": "Modern Wooden Cabinet",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "modular_street_seating": {
+    "w": 1.86,
+    "h": 0.73,
+    "d": 1.17,
+    "name": "Modular Street Seating",
+    "categories": [
+      "furniture",
+      "seating",
+      "collection: hidden_alley"
+    ]
+  },
+  "ornate_mirror_01": {
+    "w": 0.49,
+    "h": 0.74,
+    "d": 0.03,
+    "name": "Ornate Mirror 01",
+    "categories": [
+      "decorative",
+      "wall decoration",
+      "furniture"
+    ]
+  },
+  "outdoor_table_chair_set_01": {
+    "w": 0.79,
+    "h": 0.86,
+    "d": 1.71,
+    "name": "Outdoor Table Chair Set 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_bench": {
+    "w": 1.16,
+    "h": 0.89,
+    "d": 0.5,
+    "name": "Painted Wooden Bench",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_cabinet": {
+    "w": 1.19,
+    "h": 1.56,
+    "d": 0.64,
+    "name": "Painted Wooden Cabinet",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "painted_wooden_cabinet_02": {
+    "w": 1.07,
+    "h": 3,
+    "d": 0.65,
+    "name": "Painted Wooden Cabinet 02",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "painted_wooden_chair_01": {
+    "w": 0.43,
+    "h": 0.96,
+    "d": 0.54,
+    "name": "Painted Wooden Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_chair_02": {
+    "w": 0.66,
+    "h": 1.26,
+    "d": 0.64,
+    "name": "Painted Wooden Chair 02",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_nightstand": {
+    "w": 0.5,
+    "h": 0.66,
+    "d": 0.63,
+    "name": "Painted Wooden Nightstand",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "painted_wooden_shelves": {
+    "w": 0.51,
+    "h": 1.13,
+    "d": 0.37,
+    "name": "Painted Wooden Shelves",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "painted_wooden_sofa": {
+    "w": 2.45,
+    "h": 1.28,
+    "d": 0.79,
+    "name": "Painted Wooden Sofa",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "painted_wooden_stool": {
+    "w": 0.38,
+    "h": 0.58,
+    "d": 0.41,
+    "name": "Painted Wooden Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "painted_wooden_table": {
+    "w": 2.41,
+    "h": 0.96,
+    "d": 1.14,
+    "name": "Painted Wooden Table",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "plastic_monobloc_chair_01": {
+    "w": 0.64,
+    "h": 0.88,
+    "d": 0.63,
+    "name": "Plastic Monobloc Chair 01",
+    "categories": [
+      "furniture",
+      "seating",
+      "collection: the_shed"
+    ]
+  },
+  "round_wooden_table_01": {
+    "w": 1.4,
+    "h": 1.01,
+    "d": 1.4,
+    "name": "Round Wooden Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "round_wooden_table_02": {
+    "w": 0.8,
+    "h": 0.75,
+    "d": 0.8,
+    "name": "Round Wooden Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "side_table_01": {
+    "w": 0.55,
+    "h": 0.55,
+    "d": 0.45,
+    "name": "Side Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "side_table_tall_01": {
+    "w": 0.38,
+    "h": 0.76,
+    "d": 0.38,
+    "name": "Side Table Tall 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "small_wooden_table_01": {
+    "w": 0.92,
+    "h": 0.53,
+    "d": 0.44,
+    "name": "Small Wooden Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  },
+  "sofa_02": {
+    "w": 1.81,
+    "h": 0.71,
+    "d": 0.82,
+    "name": "Sofa 02",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "sofa_03": {
+    "w": 2.73,
+    "h": 1.12,
+    "d": 0.93,
+    "name": "Sofa 03",
+    "categories": [
+      "furniture",
+      "seating"
+    ]
+  },
+  "steel_frame_shelves_01": {
+    "w": 10.97,
+    "h": 21.41,
+    "d": 5.02,
+    "name": "Steel Frame Shelves 01",
+    "categories": [
+      "furniture",
+      "shelves",
+      "industrial",
+      "collection: the_shed"
+    ]
+  },
+  "steel_frame_shelves_02": {
+    "w": 0.59,
+    "h": 2.14,
+    "d": 0.5,
+    "name": "Steel Frame Shelves 02",
+    "categories": [
+      "furniture",
+      "industrial",
+      "shelves",
+      "collection: the_shed"
+    ]
+  },
+  "steel_frame_shelves_03": {
+    "w": 2.35,
+    "h": 2.36,
+    "d": 0.98,
+    "name": "Steel Frame Shelves 03",
+    "categories": [
+      "shelves",
+      "furniture"
+    ]
+  },
+  "stone_fire_pit": {
+    "w": 1.45,
+    "h": 0.39,
+    "d": 1.43,
+    "name": "Stone Fire Pit",
+    "categories": [
+      "structures",
+      "buildings",
+      "furniture",
+      "collection: the_shed"
+    ]
+  },
+  "vintage_cabinet_01": {
+    "w": 2.02,
+    "h": 2.58,
+    "d": 0.65,
+    "name": "Vintage Cabinet 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "vintage_wooden_drawer_01": {
+    "w": 0.86,
+    "h": 0.65,
+    "d": 0.44,
+    "name": "Vintage Wooden Drawer 01",
+    "categories": [
+      "furniture",
+      "shelves",
+      "table"
+    ]
+  },
+  "wooden_bookshelf_worn": {
+    "w": 1.37,
+    "h": 2.06,
+    "d": 0.58,
+    "name": "Wooden Bookshelf Worn",
+    "categories": [
+      "furniture",
+      "shelves",
+      "collection: the_shed"
+    ]
+  },
+  "wooden_display_shelves_01": {
+    "w": 0.37,
+    "h": 1.56,
+    "d": 1.08,
+    "name": "Wooden Display Shelves 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ]
+  },
+  "wooden_picnic_table": {
+    "w": 2.24,
+    "h": 0.75,
+    "d": 3.02,
+    "name": "Wooden Picnic Table",
+    "categories": [
+      "furniture",
+      "seating",
+      "table"
+    ]
+  },
+  "wooden_stool_01": {
+    "w": 0.43,
+    "h": 0.44,
+    "d": 0.44,
+    "name": "Wooden Stool 01",
+    "categories": [
+      "seating",
+      "furniture",
+      "collection: the_shed"
+    ]
+  },
+  "wooden_stool_02": {
+    "w": 0.27,
+    "h": 0.18,
+    "d": 0.18,
+    "name": "Wooden Stool 02",
+    "categories": [
+      "seating",
+      "furniture"
+    ]
+  },
+  "wooden_table_02": {
+    "w": 1.13,
+    "h": 0.8,
+    "d": 0.71,
+    "name": "Wooden Table 02",
+    "categories": [
+      "furniture",
+      "table"
+    ]
+  }
+}
