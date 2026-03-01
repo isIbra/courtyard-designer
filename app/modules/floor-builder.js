@@ -2,11 +2,11 @@
 
 import * as THREE from 'three';
 import { scene, camera, renderer } from './scene.js';
-import { getCurrentFloor, getYBase } from './floor-manager.js';
+import { getCurrentFloor, getYBase, FLOOR_HEIGHT, ensureFloor } from './floor-manager.js';
 import { createProceduralTexture } from './textures.js';
 import { putFloorTile, deleteFloorTile as dbDeleteTile } from './db.js';
 import { pushAction } from './history.js';
-import { snap as gridSnap, getFloorHit } from './grid.js';
+import { snap as gridSnap, getFloorHit, getSmartHit } from './grid.js';
 
 // ── State ──
 let buildMode = false;
@@ -47,11 +47,13 @@ function updateGhost(startPt, endPt) {
   const d = z2 - z1;
   if (w < 0.5 && d < 0.5) return;
 
-  const geo = new THREE.PlaneGeometry(Math.max(w, 0.5), Math.max(d, 0.5));
+  // Platform thickness for visual feedback
+  const platformH = 0.15;
+  const geo = new THREE.BoxGeometry(Math.max(w, 0.5), platformH, Math.max(d, 0.5));
   ghostMesh = new THREE.Mesh(geo, ghostMat);
-  ghostMesh.rotation.x = -Math.PI / 2;
-  const yBase = getYBase(getCurrentFloor());
-  ghostMesh.position.set((x1 + x2) / 2, yBase + 0.01, (z1 + z2) / 2);
+  const yBase = getYBase(startPt.buildFloor ?? getCurrentFloor());
+  ghostMesh.position.set((x1 + x2) / 2, yBase + platformH / 2, (z1 + z2) / 2);
+  ghostMesh.userData.isGhost = true;
   scene.add(ghostMesh);
 }
 
@@ -98,13 +100,15 @@ function createTileMesh(rec) {
     metalness: 0.0,
   });
 
-  const geo = new THREE.PlaneGeometry(rec.w, rec.d);
+  // Platform — thick box instead of thin plane
+  const platformH = 0.15;
+  const geo = new THREE.BoxGeometry(rec.w, platformH, rec.d);
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.x = -Math.PI / 2;
-  const yBase = (rec.floor || 0) * 3.0;
+  const yBase = (rec.floor || 0) * FLOOR_HEIGHT;
   const yOffset = rec.yOffset || 0;
-  mesh.position.set(rec.x + rec.w / 2, yBase + 0.005 + yOffset, rec.z + rec.d / 2);
+  mesh.position.set(rec.x + rec.w / 2, yBase + platformH / 2 + yOffset, rec.z + rec.d / 2);
   mesh.receiveShadow = true;
+  mesh.castShadow = true;
   mesh.name = `floorTile_${rec.id}`;
   mesh.userData.tileId = rec.id;
   mesh.userData.tileRecord = rec;
@@ -132,17 +136,18 @@ export function toggleFloorBuildMode() {
 export function onFloorClick(event) {
   if (!buildMode) return false;
 
-  const pt = getFloorHit(event);
-  if (!pt) return false;
+  const smartHit = getSmartHit(event);
+  if (!smartHit) return false;
 
-  const snapped = { x: snap(pt.x), z: snap(pt.z) };
+  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
 
   if (!startPoint) {
-    startPoint = snapped;
+    // First click — capture XZ + build floor from smart hit
+    startPoint = { ...snapped, buildFloor: smartHit.buildFloor };
     return true;
   }
 
-  // Second click — place floor tile
+  // Second click — place platform
   const x1 = Math.min(startPoint.x, snapped.x);
   const x2 = Math.max(startPoint.x, snapped.x);
   const z1 = Math.min(startPoint.z, snapped.z);
@@ -156,7 +161,9 @@ export function onFloorClick(event) {
     return true;
   }
 
-  const floor = getCurrentFloor();
+  const floor = startPoint.buildFloor;
+  ensureFloor(floor);
+
   const rec = {
     id: `ft_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     x: x1,
@@ -191,10 +198,10 @@ export function onFloorClick(event) {
 export function onFloorMouseMove(event) {
   if (!buildMode || !startPoint) return;
 
-  const pt = getFloorHit(event);
-  if (!pt) return;
+  const smartHit = getSmartHit(event);
+  if (!smartHit) return;
 
-  const snapped = { x: snap(pt.x), z: snap(pt.z) };
+  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
   updateGhost(startPoint, snapped);
 }
 

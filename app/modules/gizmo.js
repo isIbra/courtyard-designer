@@ -235,7 +235,7 @@ export function shouldBypassPostProcessing() {
 
 // ── Internal ──
 
-function snapToFurnitureTop(obj) {
+export function snapToFurnitureTop(obj) {
   // Raycast downward from above the furniture center to find other furniture surfaces
   const origin = new THREE.Vector3(obj.position.x, obj.position.y + 10, obj.position.z);
   const down = new THREE.Vector3(0, -1, 0);
@@ -258,7 +258,7 @@ function snapToFurnitureTop(obj) {
   }
 }
 
-function snapToWalls(obj) {
+export function snapToWalls(obj) {
   const item = obj.userData.item;
   if (!item) return;
 

@@ -28,29 +28,30 @@ export function addFloor() {
   return level;
 }
 
+/** Auto-create all floor levels up to (and including) the given level */
+export function ensureFloor(level) {
+  while (floors.length <= level) {
+    const l = floors.length;
+    floors.push({ level: l, name: l === 0 ? 'Ground' : `Floor ${l}` });
+  }
+  if (onFloorChange) onFloorChange(currentFloor);
+}
+
 export function switchFloor(level) {
-  if (level < 0 || level >= floors.length) return;
+  if (level < 0) return;
+  // Auto-create floor levels as needed (Satisfactory-style)
+  ensureFloor(level);
   currentFloor = level;
   updateVisibility();
   if (onFloorChange) onFloorChange(level);
 }
 
-/** Show/hide scene objects by userData.floor */
+/** Show all floors — Satisfactory-style seamless building (everything visible) */
 export function updateVisibility() {
   scene.traverse((obj) => {
     if (obj.userData.floor === undefined) return;
-    const f = obj.userData.floor;
-
-    if (f === currentFloor) {
-      obj.visible = true;
-      setOpacity(obj, 1.0);
-    } else if (f === currentFloor - 1) {
-      // Ghost floor below
-      obj.visible = true;
-      setOpacity(obj, 0.3);
-    } else {
-      obj.visible = false;
-    }
+    obj.visible = true;
+    setOpacity(obj, 1.0);
   });
 }
 

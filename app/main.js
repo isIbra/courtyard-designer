@@ -8,6 +8,8 @@ import { drawMinimap } from './modules/minimap.js';
 import { preloadModels } from './modules/furniture.js';
 import { initDesignerAPI } from './modules/designer-api.js';
 import { initGizmo, shouldBypassPostProcessing } from './modules/gizmo.js';
+import { updateFPBuild } from './modules/fp-build.js';
+import { initHand3D, updateHand3D, renderHand3D, resizeHand3D } from './modules/fp-hand-3d.js';
 import { getMeta } from './modules/db.js';
 
 const USERNAME_KEY = 'courtyard-designer-username';
@@ -131,6 +133,7 @@ async function init() {
   initPostProcessing();
   initOrbit();
   initGizmo();
+  initHand3D();
 
   // 1) Load from server first (populates IDB as cache)
   const serverLoaded = await loadFromServer(username);
@@ -186,7 +189,7 @@ async function init() {
   document.addEventListener('keyup', (e) => onKeyUp(e.key));
 
   // Resize handler
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', () => { resize(); resizeHand3D(); });
 }
 
 // ── Render loop ──
@@ -196,6 +199,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
   updateControls(dt);
+  updateFPBuild(dt);
   // Skip post-processing when gizmo is active — the built-in Three.js
   // EffectComposer swallows TransformControls' depthTest:false materials.
   // Direct rendering makes the gizmo arrows visible.
@@ -204,6 +208,8 @@ function animate() {
   } else {
     renderer.render(scene, camera);
   }
+  updateHand3D(dt);
+  renderHand3D();
   drawMinimap();
 }
 

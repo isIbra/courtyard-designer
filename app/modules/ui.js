@@ -1,10 +1,10 @@
 import { CATALOG, createMesh, placeItem, removeItem, placed, thumbnails, generateThumbnail } from './furniture.js';
 import { ROOMS, WALL_COLOR_PALETTE, setWallColor, getWallColor, setIndividualWallColor, wallMeshes } from './apartment.js';
-import { setViewMode, viewMode, requestPointerLock, onTopZoom } from './controls.js';
+import { setViewMode, viewMode, requestPointerLock, isPointerLocked, onTopZoom } from './controls.js';
 import { saveState, resetState, autoSave, saveFloorMaterial, saveWallColor } from './persistence.js';
 import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
-import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall, copyFloorLayoutUp, isOpeningSubMode } from './wall-builder.js';
+import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall, copyFloorLayoutUp, isOpeningSubMode, updateWallJunctions } from './wall-builder.js';
 import { createProceduralTexture, TEXTURE_TYPES, TEXTURE_NAMES, TEXTURE_SWATCH_COLORS } from './textures.js';
 import { getCurrentFloor, switchFloor, addFloor, getFloors, getFloorCount, setOnFloorChange, getYBase } from './floor-manager.js';
 import { toggleFloorBuildMode, isFloorBuildMode, onFloorClick, onFloorMouseMove, onFloorSelect, onFloorKeyDown, deselectTile, applyTileTexture, getSelectedTileId, floorTileRecords } from './floor-builder.js';
@@ -18,6 +18,7 @@ import { removeStair, addStair, stairMeshes, stairRecords } from './stair-builde
 import { deleteWall as dbDeleteWall, deleteFloorTile as dbDeleteTile, deleteStair as dbDeleteStair, putWall, putFloorTile, putStair } from './db.js';
 import { undo as historyUndo, redo as historyRedo, pushAction } from './history.js';
 import { attachGizmo, detachGizmo, toggleGizmoMode, isGizmoActive, isDragging, shouldSuppressClick, getAttached, getGizmoMode } from './gizmo.js';
+import { onFPClick, onFPRightClick, getFPTool, setFPTool, setFPFurniture, rotateFPPreview, cycleFPTool, toggleFPEraser, selectHotbarSlot, addToHotbar, clearFPBuild, updateFPHudVisibility } from './fp-build.js';
 import * as THREE from 'three';
 
 // ── State ──
@@ -478,44 +479,23 @@ function buildMaterialPanel() {
   }
 }
 
-// ── Floor switcher ──
+// ── Floor level indicator (Satisfactory-style: auto-detected, no manual switching) ──
 function buildFloorSwitcher() {
   const container = document.getElementById('floor-switcher');
   if (!container) return;
-
   container.innerHTML = '';
-  const floors = getFloors();
-
-  for (const f of floors) {
-    const btn = document.createElement('button');
-    btn.className = 'floor-btn' + (f.level === getCurrentFloor() ? ' active' : '');
-    btn.dataset.floor = f.level;
-    btn.textContent = f.level === 0 ? 'G' : `${f.level}`;
-    btn.addEventListener('click', () => {
-      switchFloor(f.level);
-    });
-    container.appendChild(btn);
-  }
-
-  // Add floor button
-  const addBtn = document.createElement('button');
-  addBtn.className = 'floor-btn floor-btn-add';
-  addBtn.id = 'btn-add-floor';
-  addBtn.textContent = '+';
-  addBtn.title = 'Add floor';
-  addBtn.addEventListener('click', () => {
-    addFloor();
-    toast(`Added floor ${getFloorCount() - 1}`);
-  });
-  container.appendChild(addBtn);
+  // Show a simple level indicator
+  const indicator = document.createElement('span');
+  indicator.className = 'floor-indicator';
+  indicator.id = 'floor-level-indicator';
+  indicator.textContent = `L${getCurrentFloor()}`;
+  indicator.title = 'Current level (auto-detected from cursor)';
+  container.appendChild(indicator);
 }
 
 function updateFloorSwitcherActive() {
-  const btns = document.querySelectorAll('#floor-switcher .floor-btn');
-  btns.forEach((btn) => {
-    const fl = parseInt(btn.dataset.floor);
-    btn.classList.toggle('active', fl === getCurrentFloor());
-  });
+  const indicator = document.getElementById('floor-level-indicator');
+  if (indicator) indicator.textContent = `L${getCurrentFloor()}`;
 }
 
 // ── Update tool button active states ──
@@ -538,6 +518,21 @@ function deactivateAllBuildModes() {
 
 // ── Select furniture type ──
 function selectFurniture(id) {
+  // Walk mode: route to FP build system
+  if (viewMode === 'walk') {
+    setFPTool('furniture');
+    setFPFurniture(id);
+    addToHotbar('furniture', id);
+    // Auto-close sidebar
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar.classList.contains('hidden')) {
+      sidebar.classList.add('hidden');
+      document.getElementById('viewport').classList.add('fullwidth');
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 350);
+    }
+    return;
+  }
+
   deactivateAllBuildModes();
   deactivateEraser();
   deactivateFurnitureMoveMode();
@@ -952,6 +947,7 @@ function onEraserClick(event) {
     removeWallById(id);
     wallRecords.delete(id);
     dbDeleteWall(id);
+    updateWallJunctions();
     if (savedRec) {
       pushAction({
         label: 'Erase wall',
@@ -959,11 +955,13 @@ function onEraserClick(event) {
           wallRecords.set(savedRec.id, savedRec);
           addWallFromRecord(savedRec);
           putWall(savedRec);
+          updateWallJunctions();
         },
         redo() {
           removeWallById(savedRec.id);
           wallRecords.delete(savedRec.id);
           dbDeleteWall(savedRec.id);
+          updateWallJunctions();
         },
       });
     }
@@ -1042,12 +1040,11 @@ export function initUI() {
   buildFloorSwitcher();
   buildPaintBar();
 
-  // Floor change callback
+  // Floor change callback (Satisfactory-style: all floors visible, just update grid + indicator)
   setOnFloorChange((level) => {
     buildFloorSwitcher();
     updateStairVisibility(level);
     updateGridFloor(level);
-    showLowerFloorGhosts(wallRecords, level);
   });
 
   // View mode buttons
@@ -1056,6 +1053,8 @@ export function initUI() {
       const mode = btn.dataset.view;
       document.querySelectorAll('.view-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
+      if (mode !== 'walk') clearFPBuild();
+      else updateFPHudVisibility();
       setViewMode(mode);
     });
   });
@@ -1228,7 +1227,8 @@ export function initUI() {
 
   vp.addEventListener('click', (e) => {
     if (viewMode === 'walk') {
-      requestPointerLock();
+      if (!isPointerLocked()) { requestPointerLock(); return; }
+      onFPClick();
       return;
     }
 
@@ -1319,6 +1319,7 @@ export function initUI() {
 
   vp.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    if (viewMode === 'walk' && isPointerLocked()) { onFPRightClick(); return; }
     // Paint brush eyedropper
     if (paintMode) {
       onPaintRightClick(e);
@@ -1364,6 +1365,11 @@ export function initUI() {
   });
 
   vp.addEventListener('wheel', (e) => {
+    if (viewMode === 'walk' && getFPTool()) {
+      e.preventDefault();
+      rotateFPPreview(e.deltaY > 0 ? Math.PI / 8 : -Math.PI / 8);
+      return;
+    }
     onTopZoom(e.deltaY);
   });
 
@@ -1398,7 +1404,56 @@ export function initUI() {
       const vp = document.getElementById('viewport');
       sidebar.classList.toggle('hidden');
       vp.classList.toggle('fullwidth');
+      // Exit pointer lock when sidebar opens in walk mode so user can click it
+      if (viewMode === 'walk' && !sidebar.classList.contains('hidden')) {
+        document.exitPointerLock();
+      }
       setTimeout(() => window.dispatchEvent(new Event('resize')), 350);
+    }
+
+    // ── Walk mode build keys (before viewMode !== 'walk' checks) ──
+    if (viewMode === 'walk') {
+      // B = cycle build tool
+      if (e.key === 'b' || e.key === 'B') {
+        cycleFPTool();
+        return;
+      }
+      // Q = rotate preview -45deg
+      if (e.key === 'q' || e.key === 'Q') {
+        rotateFPPreview(-Math.PI / 4);
+        return;
+      }
+      // E = rotate preview +45deg (override orbit-mode E/eraser)
+      if (e.key === 'e' || e.key === 'E') {
+        rotateFPPreview(Math.PI / 4);
+        return;
+      }
+      // X = toggle eraser
+      if (e.key === 'x' || e.key === 'X') {
+        toggleFPEraser();
+        return;
+      }
+      // G = grid toggle (allow in walk mode)
+      if (e.key === 'g' || e.key === 'G') {
+        const on = toggleGridVisible();
+        const gridBtn = document.getElementById('btn-grid');
+        if (gridBtn) gridBtn.classList.toggle('active', on);
+        toast(on ? 'Grid ON' : 'Grid OFF');
+        return;
+      }
+      // 1-9 = hotbar slots
+      if (e.key >= '1' && e.key <= '9') {
+        selectHotbarSlot(parseInt(e.key) - 1);
+        return;
+      }
+      // Escape = cancel current tool
+      if (e.key === 'Escape') {
+        if (getFPTool()) {
+          clearFPBuild();
+          toast('Build OFF');
+          return;
+        }
+      }
     }
 
     // Multi-select key handlers (Ctrl+A, Escape, Delete when selected)
@@ -1578,31 +1633,24 @@ export function initUI() {
       }
     }
 
-    // PageUp/PageDown to switch floors
+    // PageUp/PageDown to move grid level (Satisfactory-style: grid overlay shifts)
     if (e.key === 'PageUp') {
       e.preventDefault();
       const next = getCurrentFloor() + 1;
-      if (next < getFloorCount()) {
-        switchFloor(next);
-        toast(`Floor ${next === 0 ? 'G' : next}`);
-      }
+      switchFloor(next);
+      toast(`Grid → Level ${next}`);
     }
     if (e.key === 'PageDown') {
       e.preventDefault();
       const prev = getCurrentFloor() - 1;
       if (prev >= 0) {
         switchFloor(prev);
-        toast(`Floor ${prev === 0 ? 'G' : prev}`);
+        toast(`Grid → Level ${prev}`);
       }
     }
   });
 
-  // Hide controls hint after 6s
-  setTimeout(() => {
-    const hint = document.getElementById('controls-hint');
-    hint.style.opacity = '0';
-    setTimeout(() => (hint.style.display = 'none'), 500);
-  }, 6000);
+  // Controls hint stays visible
 }
 
 /** Rebuild the furniture grid (call after thumbnails are ready) */

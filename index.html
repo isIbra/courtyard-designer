@@ -27,7 +27,7 @@
     <span class="toolbar-info" id="room-info"></span>
     <div class="toolbar-right">
       <button class="tool-btn" id="btn-wall" title="Wall tool (W)">Wall</button>
-      <button class="tool-btn" id="btn-floor" title="Floor tool (F)">Floor</button>
+      <button class="tool-btn" id="btn-floor" title="Platform tool (F)">Platform</button>
       <button class="tool-btn" id="btn-stair" title="Stair tool (S)">Stairs</button>
       <button class="tool-btn" id="btn-eraser" title="Eraser (E)">Eraser</button>
       <button class="tool-btn" id="btn-move" title="Move furniture (C)">Move</button>
@@ -85,7 +85,36 @@
   <canvas id="minimap" width="200" height="200"></canvas>
 
   <!-- Crosshair for walk mode -->
-  <div id="crosshair"></div>
+  <div id="crosshair">
+    <div class="crosshair-ring"></div>
+    <div class="crosshair-dot"></div>
+  </div>
+
+  <!-- First-person build HUD -->
+  <div id="fp-hud" style="display:none">
+    <div id="fp-tool-indicator">
+      <span class="fp-tool-icon"></span>
+      <span class="fp-tool-label"></span>
+      <span class="fp-tool-hint"></span>
+    </div>
+    <div id="fp-hotbar">
+      <div class="hotbar-slot" data-slot="1"><span class="hotbar-key">1</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="2"><span class="hotbar-key">2</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="3"><span class="hotbar-key">3</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="4"><span class="hotbar-key">4</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="5"><span class="hotbar-key">5</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="6"><span class="hotbar-key">6</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="7"><span class="hotbar-key">7</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="8"><span class="hotbar-key">8</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+      <div class="hotbar-slot" data-slot="9"><span class="hotbar-key">9</span><img class="hotbar-thumb" src="" alt=""><span class="hotbar-icon"></span><span class="hotbar-glow"></span></div>
+    </div>
+    <div id="fp-measurements"></div>
+    <div id="fp-hints">
+      <span><kbd>B</kbd> Tool</span>
+      <span><kbd>Q</kbd><kbd>E</kbd> Rotate</span>
+      <span><kbd>X</kbd> Erase</span>
+    </div>
+  </div>
 
   <!-- Toast notifications -->
   <div id="toast-container"></div>
@@ -130,11 +159,11 @@
     <span><kbd>E</kbd> Eraser</span>
     <span><kbd>Ctrl+Z</kbd> Undo</span>
     <span><kbd>Tab</kbd> Panel</span>
-    <span><kbd>F</kbd> Floor</span>
+    <span><kbd>F</kbd> Platform</span>
     <span><kbd>S</kbd> Stairs</span>
     <span><kbd>P</kbd> Paint</span>
     <span><kbd>G</kbd> Grid</span>
-    <span><kbd>PgUp/Dn</kbd> Floors</span>
+    <span><kbd>PgUp/Dn</kbd> Grid Level</span>
   </div>
 
   <script type="module" src="/app/main.js"></script>

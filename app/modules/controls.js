@@ -51,8 +51,8 @@ export function setViewMode(mode) {
 
   if (orbitControls) orbitControls.enabled = (mode === 'orbit');
 
-  // Ceilings: only show in walk mode
-  setCeilingsVisible(mode === 'walk');
+  // Ceilings: disabled for Satisfactory-style multi-floor building
+  setCeilingsVisible(false);
 
   if (mode === 'orbit') {
     camera.up.set(0, 1, 0);
@@ -83,6 +83,10 @@ export function setViewMode(mode) {
 }
 
 // ── Walk pointer lock ──
+export function isPointerLocked() {
+  return walkState.locked;
+}
+
 export function requestPointerLock() {
   if (viewMode === 'walk') {
     renderer.domElement.requestPointerLock();

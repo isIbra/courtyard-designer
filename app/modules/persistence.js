@@ -71,7 +71,7 @@ export async function initPersistence() {
   let floorTiles = await getAllFloorTiles();
   if (floorTiles.length > 0) {
     loadFloorTiles(floorTiles);
-    buildCeilings(floorTiles);
+    // Ceilings disabled — Satisfactory-style multi-floor building
   }
 
   // Load stairs

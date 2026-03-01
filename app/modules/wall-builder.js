@@ -3,9 +3,9 @@ import { scene, camera, renderer } from './scene.js';
 import { addWallFromRecord, removeWallById, wallMeshes, highlightWall, unhighlightWall, H, T } from './apartment.js';
 import { putWall, deleteWall as dbDeleteWall } from './db.js';
 import { createWallRecord } from './wall-data.js';
-import { getCurrentFloor, getYBase, FLOOR_HEIGHT } from './floor-manager.js';
+import { getCurrentFloor, getYBase, FLOOR_HEIGHT, ensureFloor } from './floor-manager.js';
 import { pushAction } from './history.js';
-import { snap, getFloorHit } from './grid.js';
+import { snap, getFloorHit, getSmartHit } from './grid.js';
 
 // ── State ──
 let buildMode = false;
@@ -53,7 +53,8 @@ function updateGhost(startPt, endPt) {
   const valid = isValidPlacement(startPt, endPt);
   const mat = valid ? ghostMatValid : ghostMatInvalid;
 
-  const yBase = getYBase(getCurrentFloor());
+  // Use the build floor from the start point (captured at first click)
+  const yBase = getYBase(startPt.buildFloor ?? getCurrentFloor());
   if (dx >= dz) {
     const x1 = Math.min(startPt.x, endPt.x);
     const x2 = Math.max(startPt.x, endPt.x);
@@ -70,6 +71,7 @@ function updateGhost(startPt, endPt) {
     ghostMesh.position.set(startPt.x, H / 2 + yBase, z1 + d / 2);
   }
 
+  ghostMesh.userData.isGhost = true;
   scene.add(ghostMesh);
 }
 
@@ -99,13 +101,15 @@ export function toggleWallBuildMode() {
 export function onWallClick(event) {
   if (!buildMode) return false;
 
-  const pt = getFloorHit(event);
-  if (!pt) return false;
+  // Smart hit: detects wall tops, floor tiles, and ground
+  const smartHit = getSmartHit(event);
+  if (!smartHit) return false;
 
-  const snapped = { x: snap(pt.x), z: snap(pt.z) };
+  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
 
   if (!startPoint) {
-    startPoint = snapped;
+    // First click — capture XZ + build floor from smart hit
+    startPoint = { ...snapped, buildFloor: smartHit.buildFloor };
     return true;
   }
 
@@ -119,7 +123,10 @@ export function onWallClick(event) {
     return true;
   }
 
-  const floor = getCurrentFloor();
+  // Use the floor from the first click (consistent wall level)
+  const floor = startPoint.buildFloor;
+  ensureFloor(floor);
+
   let rec;
   if (dx >= dz) {
     const x1 = Math.min(startPoint.x, snapped.x);
@@ -162,10 +169,10 @@ export function onWallClick(event) {
 export function onWallMouseMove(event) {
   if (!buildMode || !startPoint) return;
 
-  const pt = getFloorHit(event);
-  if (!pt) return;
+  const smartHit = getSmartHit(event);
+  if (!smartHit) return;
 
-  const snapped = { x: snap(pt.x), z: snap(pt.z) };
+  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
   updateGhost(startPoint, snapped);
 }
 
@@ -392,7 +399,7 @@ function updateWallJunctions() {
   }
 }
 
-export { updateWallJunctions };
+export { updateWallJunctions, ghostMatValid, ghostMatInvalid };
 
 // ── Multi-floor wall height ──
 

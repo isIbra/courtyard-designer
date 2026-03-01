@@ -21,6 +21,7 @@ export function snapPoint(x, z, resolution = DEFAULT_SNAP) {
 
 const _raycaster = new THREE.Raycaster();
 const _mouse = new THREE.Vector2();
+const _normalMatrix = new THREE.Matrix3();
 
 export function getFloorHit(event) {
   const rect = renderer.domElement.getBoundingClientRect();
@@ -32,6 +33,67 @@ export function getFloorHit(event) {
   const pt = new THREE.Vector3();
   _raycaster.ray.intersectPlane(plane, pt);
   return pt;
+}
+
+// ── Smart scene hit — detects wall tops, floor tiles, ground ──
+// Returns { x, z, buildFloor, hitY, isTopFace } or null
+
+export function getSmartHit(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  _mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  _mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  _raycaster.setFromCamera(_mouse, camera);
+
+  // Collect hittable meshes from scene (walls, floor tiles, room floors)
+  const targets = [];
+  scene.traverse(obj => {
+    if (!obj.isMesh || !obj.visible) return;
+    if (obj.userData.isGhost) return;
+    // Direct markers on this mesh
+    if (obj.userData.wallId || obj.userData.isJunction ||
+        obj.userData.tileId || obj.userData.isFloor ||
+        obj.name?.startsWith('floor_') || obj.name?.startsWith('floorTile_')) {
+      targets.push(obj);
+      return;
+    }
+    // Wall meshes are often Groups — check parent for wallId
+    if (obj.parent && (obj.parent.userData.wallId || obj.parent.userData.isJunction)) {
+      targets.push(obj);
+    }
+  });
+
+  const hits = _raycaster.intersectObjects(targets, false);
+
+  for (const hit of hits) {
+    if (!hit.face) continue;
+
+    // Get world-space face normal
+    _normalMatrix.getNormalMatrix(hit.object.matrixWorld);
+    const worldNormal = hit.face.normal.clone().applyMatrix3(_normalMatrix).normalize();
+
+    // Top face: normal pointing up
+    if (worldNormal.y > 0.7) {
+      const hitY = hit.point.y;
+      const buildFloor = Math.max(0, Math.round(hitY / FLOOR_HEIGHT));
+      return {
+        x: hit.point.x,
+        z: hit.point.z,
+        buildFloor,
+        hitY,
+        isTopFace: true,
+      };
+    }
+  }
+
+  // Fallback: ground plane at Y = 0
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const pt = new THREE.Vector3();
+  _raycaster.ray.intersectPlane(plane, pt);
+  if (pt) {
+    return { x: pt.x, z: pt.z, buildFloor: 0, hitY: 0, isTopFace: false };
+  }
+
+  return null;
 }
 
 // ── Visual grid overlay ──

@@ -1,0 +1,588 @@
+/* ================================================================
+   FIRST-PERSON HAND OVERLAY — Holographic Build Hand
+   ================================================================ */
+
+/* ── Container ── */
+#fp-hand {
+  position: fixed;
+  bottom: -20px;
+  right: 120px;
+  width: 320px;
+  height: 420px;
+  z-index: 90;
+  pointer-events: none;
+  transform-origin: 65% 100%;
+  will-change: transform, opacity, right;
+  perspective: 600px;
+  transition: right 0.4s var(--ease-out-expo);
+}
+
+/* Shift hand left when sidebar is open */
+#sidebar:not(.hidden) ~ #fp-hand {
+  right: calc(120px + var(--sidebar-w));
+}
+
+#fp-hand[data-state="hidden"] { display: none; }
+
+/* ── SVG base ── */
+.hand-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: filter 0.5s ease;
+}
+
+/* ── Base glow — projected light beneath hand ── */
+.hand-base-glow {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  width: 180px;
+  height: 30px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(200, 169, 110, 0.25) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: baseGlowPulse 3s ease-in-out infinite;
+}
+
+@keyframes baseGlowPulse {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1.15); }
+}
+
+/* ── Wireframe grid overlay — subtle tech grid behind hand ── */
+.hand-wireframe {
+  animation: wireframeDrift 8s linear infinite;
+}
+
+@keyframes wireframeDrift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(20px); }
+}
+
+/* ── IDLE — layered bob + sway + micro-tilt ── */
+#fp-hand[data-state="idle"] {
+  animation:
+    handBob 3s ease-in-out infinite,
+    handSway 5s ease-in-out infinite;
+}
+
+@keyframes handBob {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  70% { transform: translateY(-4px); }
+}
+
+@keyframes handSway {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(0.8deg); }
+  70% { transform: rotate(-0.6deg); }
+}
+
+/* Idle finger micro-wiggle (secondary motion) */
+#fp-hand[data-state="idle"] .hand-index { animation: fingerWiggle 4s ease-in-out infinite 0s; }
+#fp-hand[data-state="idle"] .hand-middle { animation: fingerWiggle 4.3s ease-in-out infinite 0.4s; }
+#fp-hand[data-state="idle"] .hand-ring { animation: fingerWiggle 4.6s ease-in-out infinite 0.8s; }
+#fp-hand[data-state="idle"] .hand-pinky { animation: fingerWiggle 4.1s ease-in-out infinite 1.2s; }
+
+@keyframes fingerWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(-1.2deg) translateY(-1px); }
+  70% { transform: rotate(0.8deg); }
+}
+
+/* ── ENTER — holographic materialize ── */
+#fp-hand[data-state="entering"] {
+  animation: handEnter 0.75s var(--ease-spring) forwards;
+}
+
+@keyframes handEnter {
+  0% {
+    transform: translateY(220px) rotate(12deg) scale(0.5);
+    opacity: 0;
+    filter: blur(12px) brightness(3) saturate(0);
+  }
+  20% {
+    opacity: 0.4;
+    filter: blur(4px) brightness(2) saturate(0.2);
+  }
+  45% {
+    transform: translateY(-16px) rotate(-4deg) scale(1.08);
+    opacity: 0.85;
+    filter: blur(0) brightness(1.3) saturate(0.7);
+  }
+  65% {
+    transform: translateY(6px) rotate(1.5deg) scale(0.97);
+    filter: brightness(1.05);
+  }
+  80% {
+    transform: translateY(-2px) rotate(-0.5deg) scale(1.01);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+    filter: none;
+  }
+}
+
+/* Stagger fingers on enter */
+#fp-hand[data-state="entering"] .hand-thumb  { animation: fingerAppear 0.5s var(--ease-spring) 0.1s both; }
+#fp-hand[data-state="entering"] .hand-index  { animation: fingerAppear 0.5s var(--ease-spring) 0.15s both; }
+#fp-hand[data-state="entering"] .hand-middle { animation: fingerAppear 0.5s var(--ease-spring) 0.2s both; }
+#fp-hand[data-state="entering"] .hand-ring   { animation: fingerAppear 0.5s var(--ease-spring) 0.25s both; }
+#fp-hand[data-state="entering"] .hand-pinky  { animation: fingerAppear 0.5s var(--ease-spring) 0.3s both; }
+
+@keyframes fingerAppear {
+  0% { opacity: 0; transform: translateY(20px) scale(0.8); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── EXIT — dissolve ── */
+#fp-hand[data-state="exiting"] {
+  animation: handExit 0.4s ease-in forwards;
+}
+
+@keyframes handExit {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  30% { transform: translateY(15px) rotate(-4deg) scale(0.92); opacity: 0.6; filter: brightness(1.6) saturate(0.3); }
+  100% { transform: translateY(260px) rotate(18deg) scale(0.4); opacity: 0; filter: blur(10px) brightness(3) saturate(0); }
+}
+
+/* ── SWITCH — retract + glitch + re-emerge ── */
+#fp-hand[data-state="switching"] {
+  animation: handSwitch 0.7s var(--ease-spring) forwards;
+}
+
+@keyframes handSwitch {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  15%  { transform: translateY(40px) rotate(6deg) scale(0.9); opacity: 0.5; filter: blur(2px) brightness(1.5); }
+  30%  { transform: translateY(100px) rotate(8deg) scale(0.75); opacity: 0.15; filter: blur(6px) brightness(2.5); }
+  50%  { transform: translateY(100px) scale(0.75); opacity: 0.1; filter: blur(8px) brightness(3); }
+  65%  { transform: translateY(-10px) rotate(-3deg) scale(1.06); opacity: 0.8; filter: blur(0) brightness(1.2); }
+  80%  { transform: translateY(4px) rotate(1deg) scale(0.98); opacity: 0.95; }
+  100% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; filter: none; }
+}
+
+/* Holographic glitch flash during switch */
+#fp-hand[data-state="switching"] .hand-svg {
+  animation: holoGlitch 0.7s steps(1) forwards;
+}
+
+@keyframes holoGlitch {
+  0%, 100% { filter: none; }
+  18% { filter: hue-rotate(60deg) brightness(2); }
+  20% { filter: none; }
+  28% { filter: hue-rotate(-40deg) brightness(1.5) contrast(1.5); }
+  30% { filter: none; }
+  48% { filter: brightness(3) saturate(0); }
+  52% { filter: hue-rotate(30deg) brightness(1.8); }
+  55% { filter: none; }
+}
+
+/* ── PLACING — thrust + flash ── */
+#fp-hand[data-state="placing"] {
+  animation: handPlace 0.55s var(--ease-spring) forwards;
+}
+
+@keyframes handPlace {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg) scale(1); }
+  12%  { transform: translateY(-30px) translateX(-12px) rotate(-6deg) scale(1.06); }
+  28%  { transform: translateY(-52px) translateX(-18px) rotate(-10deg) scale(1.14); }
+  45%  { transform: translateY(-15px) translateX(-4px) rotate(-2deg) scale(1.02); }
+  65%  { transform: translateY(10px) translateX(4px) rotate(2deg) scale(0.96); }
+  85%  { transform: translateY(-2px) rotate(-0.5deg) scale(1.01); }
+  100% { transform: translateY(0) translateX(0) rotate(0deg) scale(1); }
+}
+
+/* Placement white-out flash on SVG */
+#fp-hand[data-state="placing"] .hand-svg {
+  animation: placeFlash 0.5s ease-out;
+}
+
+@keyframes placeFlash {
+  0%  { filter: brightness(1); }
+  15% { filter: brightness(2.5) drop-shadow(0 0 30px rgba(255,255,255,0.8)); }
+  35% { filter: brightness(1.5) drop-shadow(0 0 20px rgba(223,192,138,0.5)); }
+  100%{ filter: brightness(1); }
+}
+
+/* ── ERASING — slam + shake ── */
+#fp-hand[data-state="erasing"] {
+  animation: handErase 0.5s var(--ease-spring) forwards;
+}
+
+@keyframes handErase {
+  0%   { transform: translateX(0) rotate(0deg); }
+  15%  { transform: translateX(25px) rotate(6deg) scale(1.04); }
+  35%  { transform: translateX(-30px) rotate(-8deg) scale(1.06); }
+  55%  { transform: translateX(10px) rotate(3deg) scale(1.01); }
+  75%  { transform: translateX(-4px) rotate(-1deg); }
+  100% { transform: translateX(0) rotate(0deg) scale(1); }
+}
+
+/* ── ROTATING — wrist twist ── */
+#fp-hand[data-state="rotating"] {
+  animation: handRotate 0.4s var(--ease-spring) forwards;
+}
+
+@keyframes handRotate {
+  0%   { transform: rotate(0deg) scale(1); }
+  25%  { transform: rotate(-18deg) scale(1.04) translateY(-5px); }
+  55%  { transform: rotate(6deg) scale(0.98) translateY(2px); }
+  80%  { transform: rotate(-1deg) scale(1.01); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+/* ── FINGER POSES ── */
+.hand-finger {
+  transition: transform 0.45s var(--ease-spring);
+  transform-origin: center bottom;
+}
+
+/* Furniture: open grasp — cupping */
+#fp-hand[data-tool="furniture"] .hand-thumb  { transform: rotate(-12deg) translateX(-3px); }
+#fp-hand[data-tool="furniture"] .hand-index  { transform: rotate(6deg) translateY(8px); }
+#fp-hand[data-tool="furniture"] .hand-middle { transform: rotate(4deg) translateY(6px); }
+#fp-hand[data-tool="furniture"] .hand-ring   { transform: rotate(5deg) translateY(10px); }
+#fp-hand[data-tool="furniture"] .hand-pinky  { transform: rotate(8deg) translateY(14px); }
+
+/* Wall: flat karate-chop palm */
+#fp-hand[data-tool="wall"] .hand-thumb  { transform: rotate(18deg) translateX(6px); }
+#fp-hand[data-tool="wall"] .hand-index  { transform: rotate(-1deg) translateX(2px); }
+#fp-hand[data-tool="wall"] .hand-middle { transform: rotate(0deg) translateX(1px); }
+#fp-hand[data-tool="wall"] .hand-ring   { transform: rotate(1deg) translateX(-1px); }
+#fp-hand[data-tool="wall"] .hand-pinky  { transform: rotate(3deg) translateX(-2px); }
+
+/* Floor: wide spread — commanding gesture */
+#fp-hand[data-tool="floor"] .hand-thumb  { transform: rotate(-28deg) translateX(-10px); }
+#fp-hand[data-tool="floor"] .hand-index  { transform: rotate(-10deg) translateX(-5px); }
+#fp-hand[data-tool="floor"] .hand-middle { transform: rotate(0deg); }
+#fp-hand[data-tool="floor"] .hand-ring   { transform: rotate(10deg) translateX(5px); }
+#fp-hand[data-tool="floor"] .hand-pinky  { transform: rotate(18deg) translateX(10px); }
+
+/* Stair: pointing — index out, rest curled */
+#fp-hand[data-tool="stair"] .hand-thumb  { transform: rotate(18deg) translateX(6px) translateY(8px); }
+#fp-hand[data-tool="stair"] .hand-index  { transform: rotate(-6deg) translateY(-10px); }
+#fp-hand[data-tool="stair"] .hand-middle { transform: rotate(28deg) translateY(32px) scaleY(0.65); }
+#fp-hand[data-tool="stair"] .hand-ring   { transform: rotate(32deg) translateY(36px) scaleY(0.6); }
+#fp-hand[data-tool="stair"] .hand-pinky  { transform: rotate(38deg) translateY(38px) scaleY(0.55); }
+
+/* Eraser: tight fist */
+#fp-hand[data-tool="eraser"] .hand-thumb  { transform: rotate(22deg) translateX(10px) translateY(12px); }
+#fp-hand[data-tool="eraser"] .hand-index  { transform: rotate(38deg) translateY(42px) scaleY(0.45); }
+#fp-hand[data-tool="eraser"] .hand-middle { transform: rotate(42deg) translateY(52px) scaleY(0.4); }
+#fp-hand[data-tool="eraser"] .hand-ring   { transform: rotate(40deg) translateY(50px) scaleY(0.42); }
+#fp-hand[data-tool="eraser"] .hand-pinky  { transform: rotate(44deg) translateY(48px) scaleY(0.4); }
+
+/* ── TOOL HOLOGRAMS ── */
+.hand-tool-item {
+  opacity: 0;
+  transform: scale(0.4) translateY(25px);
+  transition: opacity 0.4s ease, transform 0.5s var(--ease-spring);
+}
+
+#fp-hand[data-tool="furniture"] .tool-furniture,
+#fp-hand[data-tool="wall"] .tool-wall,
+#fp-hand[data-tool="floor"] .tool-floor,
+#fp-hand[data-tool="stair"] .tool-stair,
+#fp-hand[data-tool="eraser"] .tool-eraser {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* Float + slow spin when idle */
+#fp-hand[data-tool="furniture"][data-state="idle"] .tool-furniture { animation: toolHoloFloat 3s ease-in-out infinite; }
+#fp-hand[data-tool="wall"][data-state="idle"] .tool-wall           { animation: toolHoloFloat 3.2s ease-in-out infinite 0.3s; }
+#fp-hand[data-tool="floor"][data-state="idle"] .tool-floor         { animation: toolHoloFloat 2.8s ease-in-out infinite 0.1s; }
+#fp-hand[data-tool="stair"][data-state="idle"] .tool-stair         { animation: toolHoloFloat 3.1s ease-in-out infinite 0.2s; }
+#fp-hand[data-tool="eraser"][data-state="idle"] .tool-eraser       { animation: toolEraserPulse 2s ease-in-out infinite; }
+
+@keyframes toolHoloFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  50% { transform: translateY(-8px) rotate(3deg) scale(1.06); }
+}
+
+@keyframes toolEraserPulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* ── ENERGY STREAMS — animated flow from wrist to fingertips ── */
+.hand-energy line {
+  transition: opacity 0.4s ease;
+}
+
+.energy-center { animation: energyStream 1.8s linear infinite; }
+.energy-left   { animation: energyStream 2.2s linear infinite -0.5s; }
+.energy-right  { animation: energyStream 2.4s linear infinite -1s; }
+.energy-thumb  { animation: energyStream 2.6s linear infinite -0.3s; }
+.energy-pinky  { animation: energyStream 2.8s linear infinite -1.4s; }
+
+@keyframes energyStream {
+  0%   { stroke-dashoffset: 0; opacity: 0.7; }
+  50%  { opacity: 1; }
+  100% { stroke-dashoffset: -50; opacity: 0.7; }
+}
+
+/* Energy brightens on active tool */
+#fp-hand[data-tool=""] .hand-energy,
+#fp-hand:not([data-tool]) .hand-energy {
+  opacity: 0.2;
+}
+
+/* Energy intensifies on placement */
+#fp-hand[data-state="placing"] .hand-energy line {
+  animation: energyFlare 0.4s ease-out;
+}
+
+@keyframes energyFlare {
+  0% { stroke-width: 1.2; opacity: 0.7; }
+  25% { stroke-width: 4; opacity: 1; }
+  100% { stroke-width: 1.2; opacity: 0.7; }
+}
+
+/* ── FINGERTIPS — pulsing glow dots ── */
+.fingertip {
+  animation: fingertipGlow 2.2s ease-in-out infinite;
+}
+
+.hand-index .fingertip  { animation-delay: 0s; }
+.hand-middle .fingertip { animation-delay: 0.3s; }
+.hand-ring .fingertip   { animation-delay: 0.6s; }
+.hand-pinky .fingertip  { animation-delay: 0.9s; }
+.hand-thumb .fingertip  { animation-delay: 1.2s; }
+
+@keyframes fingertipGlow {
+  0%, 100% { opacity: 0.5; r: 2; }
+  50% { opacity: 1; r: 3.5; }
+}
+
+/* Fingertips flare white on placement */
+#fp-hand[data-state="placing"] .fingertip {
+  animation: tipFlare 0.35s ease-out forwards;
+}
+
+@keyframes tipFlare {
+  0%  { opacity: 0.5; r: 2; fill: #f0dca0; }
+  30% { opacity: 1; r: 6; fill: #fff; }
+  100%{ opacity: 0.7; r: 3; fill: #f0dca0; }
+}
+
+/* ── JOINTS — subtle ring pulse ── */
+.joint {
+  animation: jointPulse 3s ease-in-out infinite;
+}
+
+.hand-index .joint:first-of-type  { animation-delay: 0.2s; }
+.hand-middle .joint:first-of-type { animation-delay: 0.5s; }
+.hand-ring .joint:first-of-type   { animation-delay: 0.8s; }
+
+@keyframes jointPulse {
+  0%, 100% { opacity: 0.4; stroke-width: 1; }
+  50% { opacity: 0.8; stroke-width: 1.5; }
+}
+
+/* Joints flash on placement */
+#fp-hand[data-state="placing"] .joint {
+  animation: jointFlash 0.4s ease-out;
+}
+
+@keyframes jointFlash {
+  0%  { stroke: #f0dca0; stroke-opacity: 0.4; }
+  25% { stroke: #fff; stroke-opacity: 1; stroke-width: 2.5; }
+  100%{ stroke: #f0dca0; stroke-opacity: 0.4; stroke-width: 1; }
+}
+
+/* ── WRIST NODE — pulsing connection point ── */
+.wrist-node {
+  animation: wristPulse 2s ease-in-out infinite;
+}
+
+.wrist-node-ring {
+  animation: wristRing 2s ease-in-out infinite;
+}
+
+@keyframes wristPulse {
+  0%, 100% { opacity: 0.4; r: 4; }
+  50% { opacity: 0.9; r: 5; }
+}
+
+@keyframes wristRing {
+  0%, 100% { opacity: 0.2; r: 7; }
+  50% { opacity: 0.5; r: 10; }
+}
+
+/* ── PALM GLOW — inner radiance per tool ── */
+.palm-glow-shape { transition: fill 0.5s ease, opacity 0.5s ease; }
+.palm-node { transition: fill 0.5s ease; }
+
+#fp-hand[data-tool="wall"] .palm-glow-shape     { fill: rgba(140, 200, 160, 0.2); }
+#fp-hand[data-tool="wall"] .palm-node            { fill: #8cc8a0; }
+#fp-hand[data-tool="floor"] .palm-glow-shape     { fill: rgba(154, 176, 216, 0.2); }
+#fp-hand[data-tool="floor"] .palm-node           { fill: #9ab0d8; }
+#fp-hand[data-tool="stair"] .palm-glow-shape     { fill: rgba(200, 170, 128, 0.2); }
+#fp-hand[data-tool="stair"] .palm-node           { fill: #c8aa80; }
+#fp-hand[data-tool="eraser"] .palm-glow-shape    { fill: rgba(216, 144, 144, 0.25); }
+#fp-hand[data-tool="eraser"] .palm-node          { fill: #d89090; }
+#fp-hand[data-tool="furniture"] .palm-glow-shape { fill: rgba(223, 192, 138, 0.2); }
+#fp-hand[data-tool="furniture"] .palm-node       { fill: #dfc08a; }
+
+/* Palm node pulses bigger during idle */
+#fp-hand[data-state="idle"] .palm-node {
+  animation: palmNodePulse 2.5s ease-in-out infinite;
+}
+
+@keyframes palmNodePulse {
+  0%, 100% { r: 3; opacity: 0.5; }
+  50% { r: 5; opacity: 0.9; }
+}
+
+/* ── TOOL-ACCENT DROP SHADOWS ── */
+#fp-hand[data-tool="furniture"] .hand-svg { filter: drop-shadow(0 0 20px rgba(223, 192, 138, 0.25)) drop-shadow(0 0 50px rgba(200, 169, 110, 0.1)); }
+#fp-hand[data-tool="wall"] .hand-svg      { filter: drop-shadow(0 0 20px rgba(140, 200, 160, 0.25)) drop-shadow(0 0 50px rgba(140, 200, 160, 0.1)); }
+#fp-hand[data-tool="floor"] .hand-svg     { filter: drop-shadow(0 0 20px rgba(154, 176, 216, 0.25)) drop-shadow(0 0 50px rgba(154, 176, 216, 0.1)); }
+#fp-hand[data-tool="stair"] .hand-svg     { filter: drop-shadow(0 0 20px rgba(200, 170, 128, 0.25)) drop-shadow(0 0 50px rgba(200, 170, 128, 0.1)); }
+#fp-hand[data-tool="eraser"] .hand-svg    { filter: drop-shadow(0 0 20px rgba(216, 144, 144, 0.3)) drop-shadow(0 0 50px rgba(216, 144, 144, 0.15)); }
+
+/* ── SCANLINES — rolling CRT overlay ── */
+.hand-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(200, 169, 110, 0.04) 2px,
+    rgba(200, 169, 110, 0.04) 3px
+  );
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: overlay;
+  transition: opacity 0.5s ease;
+}
+
+#fp-hand[data-tool]:not([data-tool=""]) .hand-scanlines {
+  opacity: 1;
+  animation: scanRoll 3s linear infinite;
+}
+
+@keyframes scanRoll {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 30px; }
+}
+
+/* Bright scanline flash on materialize/switch */
+#fp-hand[data-state="entering"] .hand-scanlines,
+#fp-hand[data-state="switching"] .hand-scanlines {
+  animation: scanFlash 0.5s ease-out forwards, scanRoll 3s linear infinite;
+}
+
+@keyframes scanFlash {
+  0% { opacity: 1; background-size: 100% 2px; }
+  100% { opacity: 1; background-size: 100% 3px; }
+}
+
+/* ── AMBIENT MOTES — floating particles around hand ── */
+.hand-motes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+#fp-hand[data-tool]:not([data-tool=""]) .hand-motes { opacity: 1; }
+
+.hand-motes i {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: var(--gold-bright);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(223, 192, 138, 0.6);
+  animation: moteFloat var(--d, 4s) ease-in-out infinite var(--delay, 0s);
+}
+
+.hand-motes i:nth-child(1) { left: 20%; top: 30%; --d: 3.5s; --delay: 0s; }
+.hand-motes i:nth-child(2) { left: 75%; top: 25%; --d: 4.2s; --delay: 0.8s; }
+.hand-motes i:nth-child(3) { left: 10%; top: 55%; --d: 3.8s; --delay: 1.5s; }
+.hand-motes i:nth-child(4) { left: 85%; top: 50%; --d: 4.5s; --delay: 0.3s; }
+.hand-motes i:nth-child(5) { left: 40%; top: 15%; --d: 3.2s; --delay: 2s; }
+.hand-motes i:nth-child(6) { left: 60%; top: 70%; --d: 4.8s; --delay: 1s; }
+.hand-motes i:nth-child(7) { left: 30%; top: 75%; --d: 3.6s; --delay: 0.5s; }
+.hand-motes i:nth-child(8) { left: 55%; top: 40%; --d: 4s; --delay: 1.8s; }
+
+@keyframes moteFloat {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+  25% { transform: translateY(-12px) translateX(5px); opacity: 0.8; }
+  50% { transform: translateY(-8px) translateX(-3px); opacity: 0.5; }
+  75% { transform: translateY(-15px) translateX(2px); opacity: 0.9; }
+}
+
+/* ── PARTICLE BURST — on placement ── */
+.hand-particles {
+  position: absolute;
+  top: 22%;
+  left: 42%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.hand-particles i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: var(--gold-bright);
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow: 0 0 8px rgba(223, 192, 138, 0.9), 0 0 15px rgba(223, 192, 138, 0.4);
+}
+
+#fp-hand.burst .hand-particles i {
+  animation: particleBurst 0.65s ease-out forwards;
+}
+
+#fp-hand.burst .hand-particles i:nth-child(1)  { --px: -45px; --py: -65px; animation-delay: 0s; }
+#fp-hand.burst .hand-particles i:nth-child(2)  { --px: 25px;  --py: -75px; animation-delay: 0.02s; }
+#fp-hand.burst .hand-particles i:nth-child(3)  { --px: 55px;  --py: -40px; animation-delay: 0.04s; }
+#fp-hand.burst .hand-particles i:nth-child(4)  { --px: 70px;  --py: -5px;  animation-delay: 0.01s; }
+#fp-hand.burst .hand-particles i:nth-child(5)  { --px: 55px;  --py: 35px;  animation-delay: 0.03s; }
+#fp-hand.burst .hand-particles i:nth-child(6)  { --px: 20px;  --py: 55px;  animation-delay: 0.05s; }
+#fp-hand.burst .hand-particles i:nth-child(7)  { --px: -20px; --py: 60px;  animation-delay: 0.02s; }
+#fp-hand.burst .hand-particles i:nth-child(8)  { --px: -55px; --py: 35px;  animation-delay: 0.04s; }
+#fp-hand.burst .hand-particles i:nth-child(9)  { --px: -65px; --py: 0px;   animation-delay: 0.01s; }
+#fp-hand.burst .hand-particles i:nth-child(10) { --px: -55px; --py: -35px; animation-delay: 0.03s; }
+#fp-hand.burst .hand-particles i:nth-child(11) { --px: 5px;   --py: -60px; animation-delay: 0.06s; }
+#fp-hand.burst .hand-particles i:nth-child(12) { --px: 45px;  --py: 18px;  animation-delay: 0.02s; }
+
+@keyframes particleBurst {
+  0% { transform: translate(0, 0) scale(1.2); opacity: 1; }
+  40% { opacity: 0.9; }
+  100% { transform: translate(var(--px), var(--py)) scale(0); opacity: 0; }
+}
+
+/* ── ENERGY RING — expands on placement ── */
+.hand-energy-ring {
+  position: absolute;
+  top: 22%;
+  left: 42%;
+  width: 6px;
+  height: 6px;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+#fp-hand.burst .hand-energy-ring {
+  animation: ringExpand 0.7s ease-out forwards;
+}
+
+@keyframes ringExpand {
+  0%   { width: 6px; height: 6px; opacity: 1; border-width: 3px; border-color: #fff; }
+  30%  { opacity: 0.7; border-color: var(--gold-bright); }
+  100% { width: 140px; height: 140px; opacity: 0; border-width: 1px; margin-left: -67px; margin-top: -67px; border-color: var(--gold); }
+}

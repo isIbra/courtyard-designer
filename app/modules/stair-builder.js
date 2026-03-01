@@ -2,10 +2,10 @@
 
 import * as THREE from 'three';
 import { scene, camera, renderer } from './scene.js';
-import { getCurrentFloor, getYBase, FLOOR_HEIGHT } from './floor-manager.js';
+import { getCurrentFloor, getYBase, FLOOR_HEIGHT, ensureFloor } from './floor-manager.js';
 import { putStair, deleteStair as dbDeleteStair } from './db.js';
 import { pushAction } from './history.js';
-import { snap as gridSnap, getFloorHit } from './grid.js';
+import { snap as gridSnap, getFloorHit, getSmartHit } from './grid.js';
 
 // ── State ──
 let buildMode = false;
@@ -97,7 +97,7 @@ function buildStairGroup(rec, isGhost = false) {
 // ── Ghost preview ──
 function updateGhostPosition(pt) {
   const snapped = { x: snap(pt.x), z: snap(pt.z) };
-  const floor = getCurrentFloor();
+  const floor = pt.buildFloor ?? getCurrentFloor();
 
   if (ghostGroup) {
     scene.remove(ghostGroup);
@@ -151,11 +151,12 @@ export function getStairDirection() { return direction; }
 export function onStairClick(event) {
   if (!buildMode) return false;
 
-  const pt = getFloorHit(event);
-  if (!pt) return false;
+  const smartHit = getSmartHit(event);
+  if (!smartHit) return false;
 
-  const snapped = { x: snap(pt.x), z: snap(pt.z) };
-  const floor = getCurrentFloor();
+  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
+  const floor = smartHit.buildFloor;
+  ensureFloor(floor + 1); // stairs connect to floor above
 
   const rec = {
     id: `st_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -189,9 +190,9 @@ export function onStairClick(event) {
 
 export function onStairMouseMove(event) {
   if (!buildMode) return;
-  const pt = getFloorHit(event);
-  if (!pt) return;
-  updateGhostPosition(pt);
+  const smartHit = getSmartHit(event);
+  if (!smartHit) return;
+  updateGhostPosition(smartHit);
 }
 
 export function onStairSelect(event) {
@@ -332,10 +333,8 @@ export function clearAllStairs() {
 
 /** Update stair visibility for floor switching (stairs visible on both connected floors) */
 export function updateStairVisibility(currentFloor) {
+  // Satisfactory-style: all stairs always visible
   for (const [id, group] of stairMeshes) {
-    const rec = stairRecords.get(id);
-    if (!rec) continue;
-    const visible = rec.fromFloor === currentFloor || rec.toFloor === currentFloor;
-    group.visible = visible;
+    group.visible = true;
   }
 }
