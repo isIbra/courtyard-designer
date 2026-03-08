@@ -8,6 +8,22 @@ export const T = 0.35;
 export const H = 3.0;
 export const DOOR_H = 2.1;
 
+/** Default rooms (used when server has no rooms data) */
+export const DEFAULT_ROOMS = [
+  { id: 'closet',       name: 'Closet',       x: 0.83, z: 1.41, w: 4.68, d: 11.65 },
+  { id: 'staircase',    name: 'Staircase',    x: 5.51, z: 1.41, w: 6.38, d: 5.6 },
+  { id: 'bedroom',      name: 'Bedroom',      x: 11.89, z: 2.49, w: 19.94, d: 10.75 },
+  { id: 'bathroom',     name: 'Bathroom',     x: 25.59, z: 2.49, w: 6.24, d: 6.18 },
+  { id: 'living',       name: 'Living Room',  x: 5.51, z: 7.01, w: 6.38, d: 6.15 },
+  { id: 'living_south', name: 'Living South', x: 5.51, z: 13.16, w: 6.38, d: 7.0 },
+  { id: 'storage',      name: 'Storage',      x: 0.83, z: 13.06, w: 4.68, d: 7.1 },
+  { id: 'kitchen',      name: 'Kitchen',      x: 11.89, z: 13.24, w: 9.0, d: 6.92 },
+  { id: 'guestroom',    name: 'Guest Room',   x: 20.89, z: 13.24, w: 11.02, d: 6.92 },
+  { id: 'room2',        name: 'Room 2',       x: 11.89, z: 20.16, w: 9.0, d: 6.0 },
+  { id: 'room3',        name: 'Room 3',       x: 20.89, z: 20.16, w: 11.02, d: 6.0 },
+  { id: 'room4',        name: 'Room 4',       x: 25.59, z: 8.67, w: 6.24, d: 4.57 },
+];
+
 export let ROOMS = [];
 
 /** Set rooms array dynamically (called after loading from server) */
@@ -300,14 +316,55 @@ export function setIndividualWallColor(wallId, hex) {
   }
   mesh.material.color.set(hex);
   mesh.material.map = null;
+  mesh.material.normalMap = null;
   mesh.material.needsUpdate = true;
   mesh.userData.customColor = hex;
+  mesh.userData.customTexture = null; // color overrides texture
 }
 
 /** Get current color for a specific individual wall */
 export function getIndividualWallColor(wallId) {
   const mesh = wallMeshMap.get(wallId);
   return mesh?.userData.customColor || null;
+}
+
+/** Textures suitable for wall painting */
+export const WALL_TEXTURE_PALETTE = [
+  { name: 'Red Brick',   type: 'brick_red' },
+  { name: 'White Brick',  type: 'brick_white' },
+  { name: 'Dark Brick',   type: 'brick_dark' },
+  { name: 'Concrete',     type: 'concrete_smooth' },
+  { name: 'Stone',        type: 'stone_travertine' },
+  { name: 'Subway Tile',  type: 'tile_subway' },
+  { name: 'Plaster',      type: 'plaster' },
+];
+
+/** Set texture for a specific individual wall by wallId */
+export function setIndividualWallTexture(wallId, texType) {
+  const mesh = wallMeshMap.get(wallId);
+  if (!mesh) return;
+  // Clone material if still shared
+  if (mesh.material === wallMat) {
+    mesh.material = wallMat.clone();
+  }
+  const tex = createProceduralTexture(texType);
+  const map = tex.map.clone();
+  map.repeat.set(4, 4);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.needsUpdate = true;
+  const normalMap = tex.normalMap.clone();
+  normalMap.repeat.set(4, 4);
+  normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+  normalMap.needsUpdate = true;
+
+  mesh.material.map = map;
+  mesh.material.normalMap = normalMap;
+  mesh.material.normalScale.set(tex.normalScale, tex.normalScale);
+  mesh.material.roughness = tex.roughness;
+  mesh.material.color.setHex(0xffffff); // white so texture shows true color
+  mesh.material.needsUpdate = true;
+  mesh.userData.customTexture = texType;
+  mesh.userData.customColor = null; // texture overrides color
 }
 
 const highlightMat = new THREE.MeshStandardMaterial({

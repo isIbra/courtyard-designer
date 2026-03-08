@@ -38,14 +38,14 @@ app.get('/api/state/:username', async (req, res) => {
   }
 });
 
-// PUT /api/state/:username — save design
-app.put('/api/state/:username', async (req, res) => {
-  const { walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, rooms } = req.body;
+// PUT/POST /api/state/:username — save design (POST needed for sendBeacon)
+async function saveDesign(req, res) {
+  const { walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, individualWallTextures, rooms } = req.body;
   if (!walls && !furniture && !floorMaterials) {
     return res.status(400).json({ error: 'No state data provided' });
   }
 
-  const state = { walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, rooms };
+  const state = { walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, individualWallTextures, rooms };
 
   try {
     // Upsert user
@@ -71,7 +71,9 @@ app.put('/api/state/:username', async (req, res) => {
     console.error('[PUT /api/state] Error:', err.message);
     res.status(500).json({ error: 'Database error' });
   }
-});
+}
+app.put('/api/state/:username', saveDesign);
+app.post('/api/state/:username', saveDesign);
 
 // GET /api/templates — list available templates
 app.get('/api/templates', async (req, res) => {

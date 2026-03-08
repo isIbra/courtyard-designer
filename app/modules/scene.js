@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { createProceduralTexture } from './textures.js';
 
 /* ── Sky gradient canvas (warm Riyadh desert sky) ── */
@@ -101,11 +102,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;
+renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 /* ── Post-processing ── */
 export let composer = null;
+let fxaaPass = null;
 
 export function initPostProcessing() {
   composer = new EffectComposer(renderer);
@@ -114,27 +116,35 @@ export function initPostProcessing() {
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
 
-  // SSAO for ambient occlusion — adds depth to corners and crevices
+  // SSAO — deeper radius for visible ambient occlusion in corners/crevices
   const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-  ssaoPass.kernelRadius = 1.2;
-  ssaoPass.minDistance = 0.0003;
-  ssaoPass.maxDistance = 0.15;
+  ssaoPass.kernelRadius = 1.6;
+  ssaoPass.minDistance = 0.001;
+  ssaoPass.maxDistance = 0.1;
   ssaoPass.output = SSAOPass.OUTPUT.Default;
   composer.addPass(ssaoPass);
 
-  // Subtle bloom for lights and emissive materials
+  // Bloom — warm glow on lights and bright surfaces
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.18,  // strength — subtle lamp glow
-    0.5,   // radius
-    0.82   // threshold — lamps + bright surfaces bloom
+    0.25,  // strength — visible warm glow
+    0.4,   // radius — focused
+    0.75   // threshold — catch bright surfaces + lamps
   );
   composer.addPass(bloomPass);
 
-  // FXAA anti-aliasing (final pass)
-  const fxaaPass = new ShaderPass(FXAAShader);
-  fxaaPass.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+  // FXAA anti-aliasing
+  fxaaPass = new ShaderPass(FXAAShader);
+  const pixelRatio = renderer.getPixelRatio();
+  fxaaPass.uniforms['resolution'].value.set(
+    1 / (window.innerWidth * pixelRatio),
+    1 / (window.innerHeight * pixelRatio)
+  );
   composer.addPass(fxaaPass);
+
+  // OutputPass — applies tone mapping + sRGB conversion (MUST be last)
+  const outputPass = new OutputPass();
+  composer.addPass(outputPass);
 }
 
 /* ── Camera ── */
@@ -155,59 +165,65 @@ export function initLights() {
   scene.background = createDesertSkyTexture();
   // Set PMREM environment map for realistic reflections on glass/metal
   scene.environment = createPMREMEnvMap(renderer);
-  scene.environmentIntensity = 0.6;
+  scene.environmentIntensity = 0.85;
 
-  // Warm ambient — subtle golden undertone
-  const ambient = new THREE.AmbientLight(0xffd9a0, 0.2);
+  // Warm ambient — golden undertone fills deep shadows
+  const ambient = new THREE.AmbientLight(0xffd9a0, 0.3);
   scene.add(ambient);
 
   // Hemisphere: warm sky dome + sandy ground bounce
-  const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.4);
+  const hemi = new THREE.HemisphereLight(0x9aafe0, 0xd4b07a, 0.55);
   scene.add(hemi);
 
-  // Primary sun — warm white, moderate intensity
-  sunLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
-  sunLight.position.set(8, 18, 5);
-  sunLight.castShadow = true;
-  // 4096 shadow map for crisp, detailed shadows
-  sunLight.shadow.mapSize.set(4096, 4096);
-  sunLight.shadow.camera.left = -20;
-  sunLight.shadow.camera.right = 20;
-  sunLight.shadow.camera.top = 20;
-  sunLight.shadow.camera.bottom = -20;
-  sunLight.shadow.camera.near = 0.5;
-  sunLight.shadow.camera.far = 55;
-  sunLight.shadow.bias = -0.0003;
-  sunLight.shadow.normalBias = 0.03;
-  sunLight.shadow.radius = 3.0; // softer penumbra
-  scene.add(sunLight);
+  // Building center — shadow cameras and lights orbit around this
+  const BX = 16, BZ = 14;
 
-  // Fill light from below — simulates light bouncing off sand/concrete
-  const fillBelow = new THREE.DirectionalLight(0xffe0b0, 0.15);
-  fillBelow.position.set(0, -3, 0);
-  fillBelow.target.position.set(0, 5, 0);
+  // Primary sun — strong directional, realistic outdoor intensity
+  sunLight = new THREE.DirectionalLight(0xfff0d0, 1.5);
+  sunLight.position.set(BX + 8, 18, BZ - 8);
+  sunLight.target.position.set(BX, 0, BZ);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(4096, 4096);
+  sunLight.shadow.camera.left = -22;
+  sunLight.shadow.camera.right = 22;
+  sunLight.shadow.camera.top = 22;
+  sunLight.shadow.camera.bottom = -22;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 60;
+  sunLight.shadow.bias = -0.0004;
+  sunLight.shadow.normalBias = 0.02;
+  sunLight.shadow.radius = 1.5; // crisp sun shadows with soft edges
+  scene.add(sunLight);
+  scene.add(sunLight.target);
+
+  // Fill light from below — warm ground bounce
+  const fillBelow = new THREE.DirectionalLight(0xffe0b0, 0.25);
+  fillBelow.position.set(BX, -3, BZ);
+  fillBelow.target.position.set(BX, 5, BZ);
   scene.add(fillBelow);
   scene.add(fillBelow.target);
 
-  // Secondary rim/back light — faint cool fill for depth contrast
-  const rimLight = new THREE.DirectionalLight(0xc0d0e8, 0.15);
-  rimLight.position.set(-10, 10, -8);
+  // Secondary rim/back light — cool fill for depth contrast
+  const rimLight = new THREE.DirectionalLight(0xc0d0e8, 0.2);
+  rimLight.position.set(BX - 12, 10, BZ - 10);
   scene.add(rimLight);
 
-  // Interior fill light — brightens apartment rooms
-  const interiorFill = new THREE.DirectionalLight(0xfff0d0, 0.35);
-  interiorFill.position.set(4, 12, 8);
+  // Interior fill light — brightens apartment rooms, casts secondary shadows
+  const interiorFill = new THREE.DirectionalLight(0xfff0d0, 0.45);
+  interiorFill.position.set(BX, 14, BZ - 8);
+  interiorFill.target.position.set(BX, 0, BZ);
   interiorFill.castShadow = true;
   interiorFill.shadow.mapSize.set(2048, 2048);
-  interiorFill.shadow.camera.left = -12;
-  interiorFill.shadow.camera.right = 12;
-  interiorFill.shadow.camera.top = 12;
-  interiorFill.shadow.camera.bottom = -12;
+  interiorFill.shadow.camera.left = -22;
+  interiorFill.shadow.camera.right = 22;
+  interiorFill.shadow.camera.top = 22;
+  interiorFill.shadow.camera.bottom = -22;
   interiorFill.shadow.camera.near = 0.5;
-  interiorFill.shadow.camera.far = 30;
-  interiorFill.shadow.bias = -0.0003;
-  interiorFill.shadow.normalBias = 0.03;
+  interiorFill.shadow.camera.far = 40;
+  interiorFill.shadow.bias = -0.0004;
+  interiorFill.shadow.normalBias = 0.02;
   scene.add(interiorFill);
+  scene.add(interiorFill.target);
 
   // Ground plane — sun-baked sandy concrete with texture
   const groundTex = createProceduralTexture('concrete_rough');
@@ -247,14 +263,15 @@ export function updateSun(t01) {
   const sinA = Math.sin(angle);
   const cosA = Math.cos(angle);
 
+  // Orbit sun around building center (16, 0, 14), offset south for angled shadows
   sunLight.position.set(
-    cosA * 18,
-    Math.max(sinA * 18 + 2, 1),
-    8
+    16 + cosA * 22,
+    Math.max(sinA * 22 + 2, 1),
+    6
   );
 
   // Intensity peaks at solar noon, drops at edges
-  sunLight.intensity = 0.6 + sinA * 0.5;
+  sunLight.intensity = 0.9 + sinA * 0.7;
 
   // Sky color shifts: golden-hour warmth at extremes, pale warm blue at noon
   // Red channel stays high (warm), green follows sun, blue is always subdued
@@ -286,5 +303,12 @@ export function resize() {
   renderer.setSize(w, h);
   if (composer) {
     composer.setSize(w, h);
+  }
+  if (fxaaPass) {
+    const pixelRatio = renderer.getPixelRatio();
+    fxaaPass.uniforms['resolution'].value.set(
+      1 / (w * pixelRatio),
+      1 / (h * pixelRatio)
+    );
   }
 }

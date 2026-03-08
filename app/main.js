@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { scene, renderer, camera, initLights, updateSun, resize, composer, initPostProcessing } from './modules/scene.js';
-import { setCeilingsVisible, buildRoomFloors, applyFloorTexture, setRooms } from './modules/apartment.js';
+import { setCeilingsVisible, buildRoomFloors, applyFloorTexture, setRooms, DEFAULT_ROOMS } from './modules/apartment.js';
 import { initOrbit, updateControls, onWalkMouseMove, onKeyDown, onKeyUp, viewMode } from './modules/controls.js';
-import { initPersistence, loadFloorMaterials, loadFromServer, setUsername, syncToServer } from './modules/persistence.js';
+import { initPersistence, loadFloorMaterials, loadFromServer, setUsername, syncToServer, flushSave, cacheRooms } from './modules/persistence.js';
 import { initUI, toast, refreshFurnitureGrid } from './modules/ui.js';
 import { drawMinimap } from './modules/minimap.js';
 import { preloadModels } from './modules/furniture.js';
@@ -147,6 +147,11 @@ async function init() {
   const roomsRec = await getMeta('rooms');
   if (roomsRec && roomsRec.value && roomsRec.value.length > 0) {
     setRooms(roomsRec.value);
+    cacheRooms(roomsRec.value);
+  } else {
+    // Fall back to hardcoded defaults when server has no rooms
+    setRooms(DEFAULT_ROOMS);
+    cacheRooms(DEFAULT_ROOMS);
   }
 
   // 4) Init UI (needs ROOMS populated)
@@ -190,6 +195,9 @@ async function init() {
 
   // Resize handler
   window.addEventListener('resize', () => { resize(); resizeHand3D(); });
+
+  // Save before page unload (prevents data loss on refresh/HMR)
+  window.addEventListener('beforeunload', () => flushSave());
 }
 
 // ── Render loop ──

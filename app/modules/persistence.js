@@ -9,7 +9,7 @@ import { loadWallRecords, clearAllWalls, wallRecords } from './wall-builder.js';
 import { placed, placeItem, removeItem } from './furniture.js';
 import { loadFloorTiles, clearAllFloorTiles, floorTileRecords } from './floor-builder.js';
 import { loadStairs, clearAllStairs, stairRecords } from './stair-builder.js';
-import { generateSeedFloorTiles, buildCeilings, loadWallColors, setIndividualWallColor, wallMeshMap } from './apartment.js';
+import { generateSeedFloorTiles, buildCeilings, loadWallColors, setIndividualWallColor, setIndividualWallTexture, wallMeshMap } from './apartment.js';
 
 const LS_KEY = 'courtyard-designer-v1';
 
@@ -83,7 +83,14 @@ export async function initPersistence() {
   // Load saved wall colors (per-room)
   const wallColorsRec = await getMeta('wallColors');
   if (wallColorsRec && wallColorsRec.value) {
+    cachedWallColors = wallColorsRec.value;
     loadWallColors(wallColorsRec.value);
+  }
+
+  // Cache floor materials for beacon sync
+  const floorMatRec = await getMeta('floorMaterials');
+  if (floorMatRec && floorMatRec.value) {
+    cachedFloorMaterials = floorMatRec.value;
   }
 
   // Load saved individual wall colors
@@ -92,6 +99,20 @@ export async function initPersistence() {
     for (const [wallId, hex] of Object.entries(indWallRec.value)) {
       setIndividualWallColor(wallId, hex);
     }
+  }
+
+  // Load saved individual wall textures
+  const indWallTexRec = await getMeta('individualWallTextures');
+  if (indWallTexRec && indWallTexRec.value) {
+    for (const [wallId, texType] of Object.entries(indWallTexRec.value)) {
+      setIndividualWallTexture(wallId, texType);
+    }
+  }
+
+  // Rebuild junctions after colors are applied so they match
+  if (walls.length > 0) {
+    const { updateWallJunctions } = await import('./wall-builder.js');
+    updateWallJunctions();
   }
 
   return {
@@ -127,13 +148,19 @@ export function saveState() {
 
   // Save individual wall colors
   const indColors = {};
+  const indTextures = {};
   for (const [id, mesh] of wallMeshMap.entries()) {
-    if (mesh.userData.customColor) {
+    if (mesh.userData.customTexture) {
+      indTextures[id] = mesh.userData.customTexture;
+    } else if (mesh.userData.customColor) {
       indColors[id] = mesh.userData.customColor;
     }
   }
   if (Object.keys(indColors).length > 0) {
     putMeta('individualWallColors', indColors);
+  }
+  if (Object.keys(indTextures).length > 0) {
+    putMeta('individualWallTextures', indTextures);
   }
 
   return true;
@@ -176,12 +203,63 @@ export function autoSave() {
   }, 1500);
 }
 
+// Cache meta values in memory so beforeunload can access them synchronously
+let cachedFloorMaterials = {};
+let cachedWallColors = {};
+let cachedRooms = [];
+
+export function cacheFloorMaterials(v) { cachedFloorMaterials = v; }
+export function cacheWallColors(v) { cachedWallColors = v; }
+export function cacheRooms(v) { cachedRooms = v; }
+
+/** Flush any pending saves immediately + beacon sync to server */
+export function flushSave() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+  saveState();
+  // Build state from in-memory data (synchronous) and beacon to server
+  if (!currentUsername) return;
+  try {
+    const walls = [...wallRecords.values()];
+    const furniture = placed.map((m, i) => ({
+      id: `furn_${i}_${Date.now()}`,
+      type: m.userData.furnitureId,
+      x: m.position.x, z: m.position.z, rotY: m.rotation.y,
+      floor: m.userData.floor || 0, y: m.position.y,
+      scaleX: m.userData.customScale?.x || 1,
+      scaleY: m.userData.customScale?.y || 1,
+      scaleZ: m.userData.customScale?.z || 1,
+    }));
+    const floorTiles = [...floorTileRecords.values()];
+    const stairs = [...stairRecords.values()];
+    const individualWallColors = {};
+    const individualWallTextures = {};
+    for (const [id, mesh] of wallMeshMap.entries()) {
+      if (mesh.userData.customTexture) {
+        individualWallTextures[id] = mesh.userData.customTexture;
+      } else if (mesh.userData.customColor) {
+        individualWallColors[id] = mesh.userData.customColor;
+      }
+    }
+    const body = JSON.stringify({
+      walls, furniture, floorMaterials: cachedFloorMaterials, floorTiles, stairs,
+      wallColors: cachedWallColors, individualWallColors, individualWallTextures,
+      rooms: cachedRooms,
+    });
+    navigator.sendBeacon(
+      `/api/state/${encodeURIComponent(currentUsername)}`,
+      new Blob([body], { type: 'application/json' })
+    );
+  } catch { /* best effort */ }
+}
+
 // ── Floor material persistence ──
 
 export async function saveFloorMaterial(roomId, texType) {
   const rec = await getMeta('floorMaterials');
   const map = rec ? rec.value : {};
   map[roomId] = texType;
+  cachedFloorMaterials = map;
   await putMeta('floorMaterials', map);
 }
 
@@ -196,6 +274,7 @@ export async function saveWallColor(roomId, hex) {
   const rec = await getMeta('wallColors');
   const map = rec ? rec.value : {};
   map[roomId] = hex;
+  cachedWallColors = map;
   await putMeta('wallColors', map);
 }
 
@@ -230,13 +309,15 @@ export async function syncToServer(username) {
     const wallColors = wallColorsRec ? wallColorsRec.value : {};
     const indWallRec = await getMeta('individualWallColors');
     const individualWallColors = indWallRec ? indWallRec.value : {};
+    const indWallTexRec = await getMeta('individualWallTextures');
+    const individualWallTextures = indWallTexRec ? indWallTexRec.value : {};
     const roomsRec = await getMeta('rooms');
     const rooms = roomsRec ? roomsRec.value : [];
 
     const res = await fetch(`/api/state/${encodeURIComponent(username)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, rooms }),
+      body: JSON.stringify({ walls, furniture, floorMaterials, floorTiles, stairs, wallColors, individualWallColors, individualWallTextures, rooms }),
     });
     return res.ok;
   } catch (err) {
@@ -278,6 +359,9 @@ export async function loadFromServer(username) {
     }
     if (state.individualWallColors) {
       await putMeta('individualWallColors', state.individualWallColors);
+    }
+    if (state.individualWallTextures) {
+      await putMeta('individualWallTextures', state.individualWallTextures);
     }
     if (state.rooms) {
       await putMeta('rooms', state.rooms);

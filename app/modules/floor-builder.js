@@ -24,6 +24,29 @@ function snap(v) {
   return gridSnap(v, 1.0); // 1m grid for floors
 }
 
+const EDGE_SNAP_RADIUS = 0.6;
+
+/** Snap a coordinate to nearby tile edges, falling back to grid snap */
+function snapToEdge(val, axis) {
+  let bestDist = EDGE_SNAP_RADIUS;
+  let bestVal = null;
+
+  for (const rec of floorTileRecords.values()) {
+    const edges = axis === 'x'
+      ? [rec.x, rec.x + rec.w]
+      : [rec.z, rec.z + rec.d];
+    for (const edge of edges) {
+      const dist = Math.abs(val - edge);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestVal = edge;
+      }
+    }
+  }
+
+  return bestVal !== null ? bestVal : snap(val);
+}
+
 // ── Ghost preview ──
 const ghostMat = new THREE.MeshStandardMaterial({
   color: 0xc8a96e,
@@ -139,7 +162,7 @@ export function onFloorClick(event) {
   const smartHit = getSmartHit(event);
   if (!smartHit) return false;
 
-  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
+  const snapped = { x: snapToEdge(smartHit.x, 'x'), z: snapToEdge(smartHit.z, 'z') };
 
   if (!startPoint) {
     // First click — capture XZ + build floor from smart hit
@@ -201,7 +224,7 @@ export function onFloorMouseMove(event) {
   const smartHit = getSmartHit(event);
   if (!smartHit) return;
 
-  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
+  const snapped = { x: snapToEdge(smartHit.x, 'x'), z: snapToEdge(smartHit.z, 'z') };
   updateGhost(startPoint, snapped);
 }
 

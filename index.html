@@ -39,6 +39,7 @@
       <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)">↩</button>
       <button class="tool-btn" id="btn-reset" title="Reset all">🗑</button>
       <span class="divider"></span>
+      <button class="tool-btn" id="btn-help" title="Help & Keybinds (?)">?</button>
       <span class="toolbar-user" id="toolbar-user"></span>
       <button class="tool-btn" id="btn-signout" title="Sign out" style="display:none">Sign out</button>
     </div>
@@ -164,6 +165,92 @@
     <span><kbd>P</kbd> Paint</span>
     <span><kbd>G</kbd> Grid</span>
     <span><kbd>PgUp/Dn</kbd> Grid Level</span>
+  </div>
+
+  <!-- Help / Keybinds modal -->
+  <div id="help-overlay" class="hidden">
+    <div class="help-box">
+      <div class="help-header">
+        <span class="help-title">Keybinds & Tips</span>
+        <button class="help-close" id="help-close">&times;</button>
+      </div>
+      <div class="help-body">
+
+        <div class="help-section">
+          <h3>Navigation</h3>
+          <div class="help-grid">
+            <div class="hk"><kbd>Orbit</kbd></div><div class="hd">Click + drag to orbit, scroll to zoom</div>
+            <div class="hk"><kbd>Walk</kbd></div><div class="hd">WASD to move, mouse to look around</div>
+            <div class="hk"><kbd>Top</kbd></div><div class="hd">Bird's-eye view, scroll to zoom</div>
+            <div class="hk"><kbd>Tab</kbd></div><div class="hd">Toggle sidebar panel</div>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Building Tools</h3>
+          <div class="help-grid">
+            <div class="hk"><kbd>W</kbd></div><div class="hd">Wall tool — click start, click end</div>
+            <div class="hk"><kbd>F</kbd></div><div class="hd">Platform tool — click corner, click opposite</div>
+            <div class="hk"><kbd>S</kbd></div><div class="hd">Stair tool — click to place</div>
+            <div class="hk"><kbd>E</kbd></div><div class="hd">Eraser — click to delete walls/furniture/floors</div>
+            <div class="hk"><kbd>V</kbd></div><div class="hd">Toggle wall endpoint snapping (in wall mode)</div>
+            <div class="hk"><kbd>G</kbd></div><div class="hd">Toggle grid overlay</div>
+            <div class="hk"><kbd>PgUp</kbd> / <kbd>PgDn</kbd></div><div class="hd">Switch grid level (floors)</div>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Furniture</h3>
+          <div class="help-grid">
+            <div class="hk"><kbd>Click</kbd></div><div class="hd">Select from sidebar, click to place</div>
+            <div class="hk"><kbd>R</kbd></div><div class="hd">Rotate preview 45° before placing</div>
+            <div class="hk"><kbd>C</kbd></div><div class="hd">Toggle Move mode — click furniture to select</div>
+            <div class="hk"><kbd>R</kbd> <span class="hk-note">(in Move)</span></div><div class="hd">Cycle: Move → Rotate → Scale</div>
+            <div class="hk"><kbd>Del</kbd></div><div class="hd">Delete selected furniture</div>
+            <div class="hk"><kbd>Esc</kbd></div><div class="hd">Deselect / exit mode</div>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Paint Mode</h3>
+          <div class="help-grid">
+            <div class="hk"><kbd>P</kbd></div><div class="hd">Toggle paint mode</div>
+            <div class="hk"><kbd>Left click</kbd></div><div class="hd">Apply color/texture to wall or floor tile</div>
+            <div class="hk"><kbd>Right click</kbd></div><div class="hd">Eyedropper — pick color/texture from wall or tile</div>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Walk Mode (First-Person Building)</h3>
+          <div class="help-grid">
+            <div class="hk"><kbd>B</kbd></div><div class="hd">Cycle tool: Furniture → Wall → Floor → Stair → Off</div>
+            <div class="hk"><kbd>Q</kbd> / <kbd>E</kbd></div><div class="hd">Rotate preview left/right</div>
+            <div class="hk"><kbd>X</kbd></div><div class="hd">Toggle eraser</div>
+            <div class="hk"><kbd>1</kbd>–<kbd>9</kbd></div><div class="hd">Select hotbar slot</div>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>General</h3>
+          <div class="help-grid">
+            <div class="hk"><kbd>Ctrl+Z</kbd></div><div class="hd">Undo</div>
+            <div class="hk"><kbd>Ctrl+Shift+Z</kbd></div><div class="hd">Redo</div>
+            <div class="hk"><kbd>Copy ↑</kbd> <span class="hk-note">(button)</span></div><div class="hd">Copy current floor walls to next floor</div>
+          </div>
+        </div>
+
+        <div class="help-section help-tips">
+          <h3>Tips</h3>
+          <ul>
+            <li>Furniture snaps to walls and other furniture tops automatically</li>
+            <li>In Move mode, drag the <b>Y axis</b> (green) to stack items on shelves/tables</li>
+            <li>Use the Materials tab to change floor textures and time of day</li>
+            <li>Right-click in Paint mode to pick an existing wall color</li>
+            <li>Platforms can be painted with textures just like walls</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/app/main.js"></script>

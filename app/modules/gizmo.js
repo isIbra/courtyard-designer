@@ -228,6 +228,16 @@ export function getGizmoMode() {
   return gizmoMode;
 }
 
+export function setGizmoMode(mode) {
+  if (!attachedObj) return;
+  if (mode !== 'translate' && mode !== 'rotate' && mode !== 'scale') return;
+  gizmoMode = mode;
+  transformCtrl.setMode(mode);
+  transformCtrl.showX = true;
+  transformCtrl.showY = true;
+  transformCtrl.showZ = true;
+}
+
 /** True when gizmo is visible — caller should skip EffectComposer and render directly */
 export function shouldBypassPostProcessing() {
   return attachedObj !== null;

@@ -1,10 +1,10 @@
 import { CATALOG, createMesh, placeItem, removeItem, placed, thumbnails, generateThumbnail } from './furniture.js';
-import { ROOMS, WALL_COLOR_PALETTE, setWallColor, getWallColor, setIndividualWallColor, wallMeshes } from './apartment.js';
+import { ROOMS, WALL_COLOR_PALETTE, WALL_TEXTURE_PALETTE, setWallColor, getWallColor, setIndividualWallColor, setIndividualWallTexture, wallMeshes } from './apartment.js';
 import { setViewMode, viewMode, requestPointerLock, isPointerLocked, onTopZoom } from './controls.js';
 import { saveState, resetState, autoSave, saveFloorMaterial, saveWallColor } from './persistence.js';
 import { camera, renderer, updateSun } from './scene.js';
 import { scene } from './scene.js';
-import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall, copyFloorLayoutUp, isOpeningSubMode, updateWallJunctions } from './wall-builder.js';
+import { toggleWallBuildMode, isBuildMode, onWallClick, onWallMouseMove, onWallSelect, onWallKeyDown, deselectWall, copyFloorLayoutUp, isOpeningSubMode, updateWallJunctions, toggleEndpointSnap } from './wall-builder.js';
 import { createProceduralTexture, TEXTURE_TYPES, TEXTURE_NAMES, TEXTURE_SWATCH_COLORS } from './textures.js';
 import { getCurrentFloor, switchFloor, addFloor, getFloors, getFloorCount, setOnFloorChange, getYBase } from './floor-manager.js';
 import { toggleFloorBuildMode, isFloorBuildMode, onFloorClick, onFloorMouseMove, onFloorSelect, onFloorKeyDown, deselectTile, applyTileTexture, getSelectedTileId, floorTileRecords } from './floor-builder.js';
@@ -17,7 +17,7 @@ import { removeFloorTile, addFloorTile, floorTileMeshes } from './floor-builder.
 import { removeStair, addStair, stairMeshes, stairRecords } from './stair-builder.js';
 import { deleteWall as dbDeleteWall, deleteFloorTile as dbDeleteTile, deleteStair as dbDeleteStair, putWall, putFloorTile, putStair } from './db.js';
 import { undo as historyUndo, redo as historyRedo, pushAction } from './history.js';
-import { attachGizmo, detachGizmo, toggleGizmoMode, isGizmoActive, isDragging, shouldSuppressClick, getAttached, getGizmoMode } from './gizmo.js';
+import { attachGizmo, detachGizmo, toggleGizmoMode, isGizmoActive, isDragging, shouldSuppressClick, getAttached, getGizmoMode, setGizmoMode } from './gizmo.js';
 import { onFPClick, onFPRightClick, getFPTool, setFPTool, setFPFurniture, rotateFPPreview, cycleFPTool, toggleFPEraser, selectHotbarSlot, addToHotbar, clearFPBuild, updateFPHudVisibility } from './fp-build.js';
 import * as THREE from 'three';
 
@@ -32,6 +32,7 @@ let eraserMode = false;
 let furnitureMoveMode = false;
 let paintMode = false;
 let activePaintColor = '#EBE0D0';
+let activePaintTexture = null; // null = color mode, string = texture type
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -391,6 +392,7 @@ function buildMaterialPanel() {
         if (currentColor.toLowerCase() === preset.hex.toLowerCase()) swatch.classList.add('active');
         swatch.addEventListener('click', () => {
           setWallColor(room.id, preset.hex);
+          updateWallJunctions();
           saveWallColor(room.id, preset.hex);
           autoSave();
           wallRow.querySelectorAll('.wall-swatch').forEach(s => s.classList.remove('active'));
@@ -410,6 +412,7 @@ function buildMaterialPanel() {
       picker.title = 'Custom color';
       picker.addEventListener('input', (e) => {
         setWallColor(room.id, e.target.value);
+        updateWallJunctions();
         wallRow.querySelectorAll('.wall-swatch').forEach(s => s.classList.remove('active'));
       });
       picker.addEventListener('change', (e) => {
@@ -742,6 +745,8 @@ function togglePaintMode() {
     deactivateAllBuildModes();
     deactivateEraser();
     deactivateFurnitureMoveMode();
+    // Clear FP build tool in walk mode so clicks go to paint
+    if (viewMode === 'walk') clearFPBuild();
     selectedType = null;
     if (ghostMesh) { scene.remove(ghostMesh); ghostMesh = null; }
     buildFurnitureGrid();
@@ -767,15 +772,33 @@ function onPaintClick(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
+  // Try walls first
   const hits = raycaster.intersectObjects(wallMeshes);
-  if (hits.length === 0) return;
+  if (hits.length > 0) {
+    const wallMesh = hits[0].object;
+    const wallId = wallMesh.userData.wallId;
+    if (wallId) {
+      if (activePaintTexture) {
+        setIndividualWallTexture(wallId, activePaintTexture);
+      } else {
+        setIndividualWallColor(wallId, activePaintColor);
+      }
+      updateWallJunctions();
+      autoSave();
+      return;
+    }
+  }
 
-  const wallMesh = hits[0].object;
-  const wallId = wallMesh.userData.wallId;
-  if (!wallId) return;
-
-  setIndividualWallColor(wallId, activePaintColor);
-  autoSave();
+  // Try floor tiles
+  const tileMeshArr = [...floorTileMeshes.values()];
+  const tileHits = raycaster.intersectObjects(tileMeshArr);
+  if (tileHits.length > 0) {
+    const tileId = tileHits[0].object.userData.tileId;
+    if (tileId && activePaintTexture) {
+      applyTileTexture(tileId, activePaintTexture);
+      autoSave();
+    }
+  }
 }
 
 function onPaintRightClick(event) {
@@ -786,22 +809,129 @@ function onPaintRightClick(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
+  // Try walls first
   const hits = raycaster.intersectObjects(wallMeshes);
-  if (hits.length === 0) return;
+  if (hits.length > 0) {
+    const wallMesh = hits[0].object;
+    if (wallMesh.userData.customTexture) {
+      activePaintTexture = wallMesh.userData.customTexture;
+      updatePaintBarActive();
+      toast(`Picked texture: ${wallMesh.userData.customTexture}`);
+    } else {
+      activePaintTexture = null;
+      const color = '#' + wallMesh.material.color.getHexString();
+      activePaintColor = color;
+      updatePaintBarActive();
+      toast(`Picked color: ${color}`);
+    }
+    return;
+  }
 
-  const wallMesh = hits[0].object;
-  const color = '#' + wallMesh.material.color.getHexString();
-  activePaintColor = color;
-  // Update paint bar swatches
-  updatePaintBarActive();
-  toast(`Picked color: ${color}`);
+  // Try floor tiles (eyedropper)
+  const tileMeshArr = [...floorTileMeshes.values()];
+  const tileHits = raycaster.intersectObjects(tileMeshArr);
+  if (tileHits.length > 0) {
+    const rec = tileHits[0].object.userData.tileRecord;
+    if (rec && rec.texType) {
+      activePaintTexture = rec.texType;
+      updatePaintBarActive();
+      toast(`Picked texture: ${rec.texType}`);
+    }
+  }
+}
+
+// Walk-mode paint: raycast from screen center (pointer locked)
+function onPaintClickCenter() {
+  raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+  const targets = [];
+  for (const obj of wallMeshes) {
+    if (obj.isGroup) {
+      obj.traverse((c) => { if (c.isMesh) targets.push(c); });
+    } else if (obj.isMesh) {
+      targets.push(obj);
+    }
+  }
+  // Try walls first
+  const hits = raycaster.intersectObjects(targets);
+  if (hits.length > 0) {
+    let obj = hits[0].object;
+    let wallId = obj.userData.wallId;
+    while (!wallId && obj.parent) { obj = obj.parent; wallId = obj.userData.wallId; }
+    if (wallId) {
+      if (activePaintTexture) {
+        setIndividualWallTexture(wallId, activePaintTexture);
+      } else {
+        setIndividualWallColor(wallId, activePaintColor);
+      }
+      updateWallJunctions();
+      autoSave();
+      return;
+    }
+  }
+
+  // Try floor tiles
+  const tileMeshArr = [...floorTileMeshes.values()];
+  const tileHits = raycaster.intersectObjects(tileMeshArr);
+  if (tileHits.length > 0) {
+    const tileId = tileHits[0].object.userData.tileId;
+    if (tileId && activePaintTexture) {
+      applyTileTexture(tileId, activePaintTexture);
+      autoSave();
+    }
+  }
+}
+
+function onPaintRightClickCenter() {
+  raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+  const targets = [];
+  for (const obj of wallMeshes) {
+    if (obj.isGroup) {
+      obj.traverse((c) => { if (c.isMesh) targets.push(c); });
+    } else if (obj.isMesh) {
+      targets.push(obj);
+    }
+  }
+  // Try walls first
+  const hits = raycaster.intersectObjects(targets);
+  if (hits.length > 0) {
+    const wallMesh = hits[0].object;
+    if (wallMesh.userData.customTexture) {
+      activePaintTexture = wallMesh.userData.customTexture;
+      updatePaintBarActive();
+      toast(`Picked texture: ${wallMesh.userData.customTexture}`);
+    } else {
+      activePaintTexture = null;
+      const color = '#' + wallMesh.material.color.getHexString();
+      activePaintColor = color;
+      updatePaintBarActive();
+      toast(`Picked color: ${color}`);
+    }
+    return;
+  }
+
+  // Try floor tiles (eyedropper)
+  const tileMeshArr = [...floorTileMeshes.values()];
+  const tileHits = raycaster.intersectObjects(tileMeshArr);
+  if (tileHits.length > 0) {
+    const rec = tileHits[0].object.userData.tileRecord;
+    if (rec && rec.texType) {
+      activePaintTexture = rec.texType;
+      updatePaintBarActive();
+      toast(`Picked texture: ${rec.texType}`);
+    }
+  }
 }
 
 function updatePaintBarActive() {
   const bar = document.getElementById('paint-bar');
   if (!bar) return;
+  // Color swatches
   bar.querySelectorAll('.wall-swatch').forEach((s) => {
-    s.classList.toggle('active', s.dataset.hex && s.dataset.hex.toLowerCase() === activePaintColor.toLowerCase());
+    s.classList.toggle('active', !activePaintTexture && s.dataset.hex && s.dataset.hex.toLowerCase() === activePaintColor.toLowerCase());
+  });
+  // Texture swatches
+  bar.querySelectorAll('.wall-tex-swatch').forEach((s) => {
+    s.classList.toggle('active', activePaintTexture && s.dataset.tex === activePaintTexture);
   });
   const picker = bar.querySelector('.wall-color-picker');
   if (picker) picker.value = activePaintColor;
@@ -823,10 +953,11 @@ function buildPaintBar() {
     swatch.style.background = preset.hex;
     swatch.title = preset.name;
     swatch.dataset.hex = preset.hex;
-    if (activePaintColor.toLowerCase() === preset.hex.toLowerCase()) swatch.classList.add('active');
+    if (!activePaintTexture && activePaintColor.toLowerCase() === preset.hex.toLowerCase()) swatch.classList.add('active');
     swatch.addEventListener('click', (e) => {
       e.stopPropagation();
       activePaintColor = preset.hex;
+      activePaintTexture = null;
       updatePaintBarActive();
     });
     bar.appendChild(swatch);
@@ -840,9 +971,32 @@ function buildPaintBar() {
   picker.addEventListener('input', (e) => {
     e.stopPropagation();
     activePaintColor = e.target.value;
-    bar.querySelectorAll('.wall-swatch').forEach((s) => s.classList.remove('active'));
+    activePaintTexture = null;
+    updatePaintBarActive();
   });
   bar.appendChild(picker);
+
+  // Separator
+  const sep = document.createElement('span');
+  sep.className = 'paint-bar-sep';
+  sep.textContent = '|';
+  bar.appendChild(sep);
+
+  // Texture swatches
+  for (const tex of WALL_TEXTURE_PALETTE) {
+    const swatch = document.createElement('div');
+    swatch.className = 'wall-tex-swatch';
+    swatch.title = tex.name;
+    swatch.dataset.tex = tex.type;
+    swatch.style.background = TEXTURE_SWATCH_COLORS[tex.type] || '#888';
+    if (activePaintTexture === tex.type) swatch.classList.add('active');
+    swatch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      activePaintTexture = tex.type;
+      updatePaintBarActive();
+    });
+    bar.appendChild(swatch);
+  }
 
   const hint = document.createElement('span');
   hint.className = 'paint-bar-hint';
@@ -892,14 +1046,48 @@ function updateMoveSelectionBar() {
   const bar = document.getElementById('selection-bar');
   const name = selectedObj.userData.item?.name || selectedObj.userData.furnitureId;
   const mode = getGizmoMode();
-  if (mode === 'translate') {
-    bar.textContent = `${name} \u2014 drag to MOVE  [R] rotate  [Del] remove  [Esc] deselect`;
-  } else if (mode === 'rotate') {
-    bar.textContent = `${name} \u2014 drag to ROTATE  [R] scale  [Del] remove  [Esc] deselect`;
-  } else {
-    bar.textContent = `${name} \u2014 drag to SCALE  [R] move  [Del] remove  [Esc] deselect`;
+
+  bar.innerHTML = '';
+
+  // Name label
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'sel-name';
+  nameSpan.textContent = name;
+  bar.appendChild(nameSpan);
+
+  // Separator
+  const sep = document.createElement('span');
+  sep.className = 'sel-sep';
+  sep.textContent = '\u2014';
+  bar.appendChild(sep);
+
+  // Mode buttons
+  const modes = [
+    { id: 'translate', label: 'Move', key: 'R' },
+    { id: 'rotate', label: 'Rotate', key: 'R' },
+    { id: 'scale', label: 'Scale', key: 'R' },
+  ];
+  const modeGroup = document.createElement('span');
+  modeGroup.className = 'sel-modes';
+  for (const m of modes) {
+    const btn = document.createElement('button');
+    btn.className = 'sel-mode-btn' + (mode === m.id ? ' active' : '');
+    btn.textContent = m.label;
+    btn.addEventListener('click', () => {
+      setGizmoMode(m.id);
+      updateMoveSelectionBar();
+    });
+    modeGroup.appendChild(btn);
   }
-  bar.style.display = 'block';
+  bar.appendChild(modeGroup);
+
+  // Hint text
+  const hint = document.createElement('span');
+  hint.className = 'sel-hint';
+  hint.innerHTML = '<kbd>R</kbd> cycle \u00a0 <kbd>Del</kbd> remove \u00a0 <kbd>Esc</kbd> deselect';
+  bar.appendChild(hint);
+
+  bar.style.display = 'flex';
 }
 
 function onEraserClick(event) {
@@ -1211,6 +1399,18 @@ export function initUI() {
     }
   });
 
+  // Help modal
+  const helpOverlay = document.getElementById('help-overlay');
+  const helpBtn = document.getElementById('btn-help');
+  const helpClose = document.getElementById('help-close');
+  if (helpBtn && helpOverlay) {
+    helpBtn.addEventListener('click', () => helpOverlay.classList.remove('hidden'));
+    helpClose.addEventListener('click', () => helpOverlay.classList.add('hidden'));
+    helpOverlay.addEventListener('click', (e) => {
+      if (e.target === helpOverlay) helpOverlay.classList.add('hidden');
+    });
+  }
+
   // ── Viewport events ──
   const vp = renderer.domElement;
 
@@ -1228,6 +1428,8 @@ export function initUI() {
   vp.addEventListener('click', (e) => {
     if (viewMode === 'walk') {
       if (!isPointerLocked()) { requestPointerLock(); return; }
+      // Paint mode in walk: raycast from screen center
+      if (paintMode) { onPaintClickCenter(); return; }
       onFPClick();
       return;
     }
@@ -1271,10 +1473,13 @@ export function initUI() {
       if (pt) {
         const rot = ghostMesh ? ghostMesh.rotation.y : 0;
         const floor = getCurrentFloor();
-        const mesh = placeItem(selectedType, pt.x, pt.z, rot, floor);
+        // Snap to same grid the ghost preview uses
+        const sx = Math.round(pt.x / 0.25) * 0.25;
+        const sz = Math.round(pt.z / 0.25) * 0.25;
+        const mesh = placeItem(selectedType, sx, sz, rot, floor);
         if (mesh) {
           const savedType = selectedType;
-          const savedX = pt.x, savedZ = pt.z, savedRot = rot, savedFloor = floor;
+          const savedX = sx, savedZ = sz, savedRot = rot, savedFloor = floor;
           pushAction({
             label: `Place ${savedType}`,
             undo() {
@@ -1319,7 +1524,11 @@ export function initUI() {
 
   vp.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (viewMode === 'walk' && isPointerLocked()) { onFPRightClick(); return; }
+    if (viewMode === 'walk' && isPointerLocked()) {
+      // Paint eyedropper in walk mode: pick color from center-screen wall
+      if (paintMode) { onPaintRightClickCenter(); return; }
+      onFPRightClick(); return;
+    }
     // Paint brush eyedropper
     if (paintMode) {
       onPaintRightClick(e);
@@ -1375,6 +1584,13 @@ export function initUI() {
 
   // ── Keyboard ──
   document.addEventListener('keydown', (e) => {
+    // ? key opens help modal
+    if (e.key === '?') {
+      const helpOv = document.getElementById('help-overlay');
+      if (helpOv) helpOv.classList.toggle('hidden');
+      return;
+    }
+
     // Undo: Ctrl+Z
     if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
       e.preventDefault();
@@ -1446,8 +1662,13 @@ export function initUI() {
         selectHotbarSlot(parseInt(e.key) - 1);
         return;
       }
-      // Escape = cancel current tool
+      // Escape = cancel current tool or paint mode
       if (e.key === 'Escape') {
+        if (paintMode) {
+          deactivatePaintMode();
+          toast('Paint mode OFF');
+          return;
+        }
         if (getFPTool()) {
           clearFPBuild();
           toast('Build OFF');
@@ -1528,6 +1749,13 @@ export function initUI() {
       return;
     }
 
+    // V toggles wall endpoint snap
+    if ((e.key === 'v' || e.key === 'V') && isBuildMode()) {
+      const on = toggleEndpointSnap();
+      toast(on ? 'Snap to walls ON' : 'Snap to walls OFF');
+      return;
+    }
+
     // E toggles eraser mode (only when not in walk mode)
     if ((e.key === 'e' || e.key === 'E') && viewMode !== 'walk') {
       deactivateAllBuildModes();
@@ -1548,8 +1776,8 @@ export function initUI() {
       return;
     }
 
-    // P toggles paint brush mode (only when not in walk mode)
-    if ((e.key === 'p' || e.key === 'P') && viewMode !== 'walk') {
+    // P toggles paint brush mode
+    if ((e.key === 'p' || e.key === 'P')) {
       const on = togglePaintMode();
       toast(on ? 'Paint mode ON — click walls to paint' : 'Paint mode OFF');
       return;
@@ -1568,6 +1796,12 @@ export function initUI() {
     if (onWallKeyDown(e.key)) return;
 
     if (e.key === 'Escape') {
+      // Close help modal if open
+      const helpOv = document.getElementById('help-overlay');
+      if (helpOv && !helpOv.classList.contains('hidden')) {
+        helpOv.classList.add('hidden');
+        return;
+      }
       // Paint mode: exit paint mode
       if (paintMode) {
         deactivatePaintMode();

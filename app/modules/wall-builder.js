@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { scene, camera, renderer } from './scene.js';
-import { addWallFromRecord, removeWallById, wallMeshes, highlightWall, unhighlightWall, H, T } from './apartment.js';
+import { addWallFromRecord, removeWallById, wallMeshes, wallMeshMap, setIndividualWallColor, highlightWall, unhighlightWall, H, T } from './apartment.js';
 import { putWall, deleteWall as dbDeleteWall } from './db.js';
 import { createWallRecord } from './wall-data.js';
 import { getCurrentFloor, getYBase, FLOOR_HEIGHT, ensureFloor } from './floor-manager.js';
@@ -83,6 +83,48 @@ function clearGhost() {
   }
 }
 
+// ── Wall endpoint snapping (Satisfactory-style, toggle with V) ──
+let endpointSnap = false;
+const SNAP_RADIUS = 0.5;
+
+export function isEndpointSnap() { return endpointSnap; }
+export function toggleEndpointSnap() {
+  endpointSnap = !endpointSnap;
+  return endpointSnap;
+}
+
+function snapToEndpoint(x, z) {
+  if (!endpointSnap) return { x: snap(x), z: snap(z) };
+  let bestDist = SNAP_RADIUS;
+  let bestPt = null;
+
+  for (const rec of wallRecords.values()) {
+    let endpoints;
+    if (rec.type === 'h') {
+      endpoints = [
+        { x: rec.x1, z: rec.z },
+        { x: rec.x2, z: rec.z },
+      ];
+    } else {
+      endpoints = [
+        { x: rec.x, z: rec.z1 },
+        { x: rec.x, z: rec.z2 },
+      ];
+    }
+    for (const ep of endpoints) {
+      const dx = x - ep.x;
+      const dz = z - ep.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPt = { x: ep.x, z: ep.z };
+      }
+    }
+  }
+
+  return bestPt || { x: snap(x), z: snap(z) };
+}
+
 // ── Public API ──
 
 export function isBuildMode() { return buildMode; }
@@ -105,7 +147,8 @@ export function onWallClick(event) {
   const smartHit = getSmartHit(event);
   if (!smartHit) return false;
 
-  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
+  // Snap to nearest wall endpoint first, fall back to grid
+  const snapped = snapToEndpoint(smartHit.x, smartHit.z);
 
   if (!startPoint) {
     // First click — capture XZ + build floor from smart hit
@@ -172,7 +215,7 @@ export function onWallMouseMove(event) {
   const smartHit = getSmartHit(event);
   if (!smartHit) return;
 
-  const snapped = { x: snap(smartHit.x), z: snap(smartHit.z) };
+  const snapped = snapToEndpoint(smartHit.x, smartHit.z);
   updateGhost(startPoint, snapped);
 }
 
@@ -349,22 +392,15 @@ function updateWallJunctions() {
   const hWalls = recs.filter(r => r.type === 'h');
   const vWalls = recs.filter(r => r.type === 'v');
 
-  // Get wall material from an existing wall mesh
-  let juncMat = null;
-  for (const obj of wallMeshes) {
-    if (obj.isMesh && obj.material) {
-      juncMat = obj.material;
-      break;
-    }
-    if (obj.isGroup) {
-      obj.traverse((c) => {
-        if (!juncMat && c.isMesh && c.material) juncMat = c.material;
-      });
-      if (juncMat) break;
-    }
-  }
-  if (!juncMat) {
-    juncMat = new THREE.MeshStandardMaterial({ color: 0xEBE0D0, roughness: 0.92 });
+  // Get color from a wall mesh for junction matching
+  function getWallColor(wallId) {
+    const m = wallMeshMap.get(wallId);
+    if (!m) return null;
+    if (m.isMesh && m.material) return m.material.color;
+    // Group — find first child mesh color
+    let color = null;
+    if (m.isGroup) m.traverse((c) => { if (!color && c.isMesh && c.material) color = c.material.color; });
+    return color;
   }
 
   for (const hw of hWalls) {
@@ -383,10 +419,38 @@ function updateWallJunctions() {
 
       if (vw.x >= hw.x1 - halfVT && vw.x <= hw.x2 + halfVT &&
           hw.z >= vw.z1 - halfHT && hw.z <= vw.z2 + halfHT) {
+
+        // Skip if junction overlaps an opening in either wall
+        let blocked = false;
+        if (hw.openings) {
+          for (const op of hw.openings) {
+            const opAbsPos = hw.x1 + op.pos;
+            if (vw.x >= opAbsPos - op.w / 2 - halfVT && vw.x <= opAbsPos + op.w / 2 + halfVT) {
+              blocked = true; break;
+            }
+          }
+        }
+        if (!blocked && vw.openings) {
+          for (const op of vw.openings) {
+            const opAbsPos = vw.z1 + op.pos;
+            if (hw.z >= opAbsPos - op.w / 2 - halfHT && hw.z <= opAbsPos + op.w / 2 + halfHT) {
+              blocked = true; break;
+            }
+          }
+        }
+        if (blocked) continue;
+
         const floor = hw.floor || 0;
         const yBase = getYBase(floor);
+        // Match junction color to the intersecting wall
+        const color = getWallColor(hw.id) || getWallColor(vw.id) || new THREE.Color(0xEBE0D0);
+        const mat = new THREE.MeshStandardMaterial({
+          color: color.clone(),
+          roughness: 0.92,
+          metalness: 0.0,
+        });
         const geo = new THREE.BoxGeometry(vwT, juncH, hwT);
-        const mesh = new THREE.Mesh(geo, juncMat);
+        const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(vw.x, juncH / 2 + yBase, hw.z);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -452,10 +516,11 @@ function extendWallHeight(wallId) {
 
 export function copyFloorLayoutUp(sourceFloor) {
   const targetFloor = sourceFloor + 1;
-  const toCopy = [...wallRecords.values()].filter(r => (r.floor || 0) === sourceFloor && !r.isOriginal);
+  const toCopy = [...wallRecords.values()].filter(r => (r.floor || 0) === sourceFloor);
   if (toCopy.length === 0) return 0;
 
   const newIds = [];
+  const colorMap = []; // { newId, hex } pairs for color application
   for (const orig of toCopy) {
     const params = orig.type === 'h'
       ? { z: orig.z, x1: orig.x1, x2: orig.x2 }
@@ -465,8 +530,18 @@ export function copyFloorLayoutUp(sourceFloor) {
     rec.openings = orig.openings ? JSON.parse(JSON.stringify(orig.openings)) : [];
     wallRecords.set(rec.id, rec);
     addWallFromRecord(rec);
+    // Copy color from source wall
+    const srcMesh = wallMeshMap.get(orig.id);
+    if (srcMesh) {
+      const hex = '#' + (srcMesh.isMesh ? srcMesh.material.color : new THREE.Color(0xEBE0D0)).getHexString();
+      colorMap.push({ newId: rec.id, hex });
+    }
     putWall(rec);
     newIds.push(rec.id);
+  }
+  // Apply colors after all walls are created
+  for (const { newId, hex } of colorMap) {
+    setIndividualWallColor(newId, hex);
   }
 
   updateWallJunctions();
@@ -492,6 +567,9 @@ export function copyFloorLayoutUp(sourceFloor) {
         wallRecords.set(rec.id, rec);
         addWallFromRecord(rec);
         putWall(rec);
+      }
+      for (const { newId, hex } of colorMap) {
+        setIndividualWallColor(newId, hex);
       }
       updateWallJunctions();
     },

@@ -64,7 +64,7 @@ function multiOctaveNoise(ctx, w, h, baseScale, alpha, color, octaves = 3) {
 }
 
 /** Generate normal map from heightmap canvas (Sobel) */
-function generateNormalFromHeight(srcCanvas, strength = 3.5) {
+function generateNormalFromHeight(srcCanvas, strength = 5.0) {
   const w = srcCanvas.width;
   const h = srcCanvas.height;
   const srcCtx = srcCanvas.getContext('2d');
@@ -421,6 +421,53 @@ function drawConcreteEpoxy(ctx, w, h) {
   }
 }
 
+function drawBrick(ctx, w, h, baseR, baseG, baseB, mortarColor) {
+  const brickW = 60;
+  const brickH = 20;
+  const mortar = 3;
+  const rand = seededRandom(baseR * 100 + baseG * 10 + baseB);
+
+  // Fill with mortar
+  ctx.fillStyle = mortarColor;
+  ctx.fillRect(0, 0, w, h);
+
+  const rowH = brickH + mortar;
+
+  for (let row = 0; row < Math.ceil(h / rowH) + 1; row++) {
+    const offset = (row % 2) * (brickW / 2 + mortar / 2);
+    const y = row * rowH;
+
+    for (let col = -1; col < Math.ceil(w / (brickW + mortar)) + 1; col++) {
+      const x = col * (brickW + mortar) + offset;
+
+      // Per-brick color variation
+      const variation = (rand() - 0.5) * 30;
+      const r = Math.max(0, Math.min(255, baseR + variation));
+      const g = Math.max(0, Math.min(255, baseG + variation * 0.7));
+      const b = Math.max(0, Math.min(255, baseB + variation * 0.5));
+
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, brickW, brickH);
+
+      // Surface speckles
+      for (let d = 0; d < 10; d++) {
+        const dx = x + rand() * brickW;
+        const dy = y + rand() * brickH;
+        ctx.fillStyle = `rgba(0,0,0,${rand() * 0.08})`;
+        ctx.fillRect(dx, dy, 1 + rand() * 2, 1);
+      }
+
+      // Edge highlight (top-left) and shadow (bottom-right)
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(x, y, brickW, 1);
+      ctx.fillRect(x, y, 1, brickH);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(x, y + brickH - 1, brickW, 1);
+      ctx.fillRect(x + brickW - 1, y, 1, brickH);
+    }
+  }
+}
+
 function drawPlaster(ctx, w, h) {
   ctx.fillStyle = '#E8DDD0';
   ctx.fillRect(0, 0, w, h);
@@ -440,8 +487,8 @@ function drawPlaster(ctx, w, h) {
 
 function generateTextureCanvas(type) {
   // 1024 for floors (wood, marble, tile, stone, concrete, epoxy), 512 for walls/ceilings
-  const isFloorType = !type.startsWith('plaster');
-  const size = isFloorType ? 1024 : 512;
+  const isWallOnly = type.startsWith('plaster') || type.startsWith('brick');
+  const size = isWallOnly ? 512 : 1024;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -493,6 +540,15 @@ function generateTextureCanvas(type) {
     case 'concrete_epoxy':
       drawConcreteEpoxy(ctx, size, size);
       break;
+    case 'brick_red':
+      drawBrick(ctx, size, size, 160, 75, 55, '#B0A898');
+      break;
+    case 'brick_white':
+      drawBrick(ctx, size, size, 220, 215, 205, '#D0CBC5');
+      break;
+    case 'brick_dark':
+      drawBrick(ctx, size, size, 85, 65, 55, '#908880');
+      break;
     case 'plaster':
       drawPlaster(ctx, size, size);
       break;
@@ -517,12 +573,14 @@ export function createProceduralTexture(type) {
   map.wrapS = THREE.RepeatWrapping;
   map.wrapT = THREE.RepeatWrapping;
   map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 16; // crisp at oblique angles
 
   // Generate normal map
   const normalCanvas = generateNormalFromHeight(canvas);
   const normalMap = new THREE.CanvasTexture(normalCanvas);
   normalMap.wrapS = THREE.RepeatWrapping;
   normalMap.wrapT = THREE.RepeatWrapping;
+  normalMap.anisotropy = 16;
 
   // Roughness per type
   let roughness = 0.7;
@@ -533,18 +591,20 @@ export function createProceduralTexture(type) {
   else if (type === 'concrete_rough') roughness = 0.9;
   else if (type === 'concrete_epoxy') roughness = 0.12;
   else if (type.startsWith('stone')) roughness = 0.7;
+  else if (type.startsWith('brick')) roughness = 0.85;
   else if (type === 'plaster') roughness = 0.92;
 
-  // Recommended normalScale per type
-  let normalScale = 0.3;
-  if (type.startsWith('marble')) normalScale = 0.15;
-  else if (type.startsWith('wood')) normalScale = 0.4;
-  else if (type.startsWith('tile')) normalScale = 0.5;
-  else if (type === 'concrete_smooth') normalScale = 0.4;
-  else if (type === 'concrete_rough') normalScale = 0.6;
-  else if (type === 'concrete_epoxy') normalScale = 0.3;
-  else if (type.startsWith('stone')) normalScale = 0.5;
-  else if (type === 'plaster') normalScale = 0.2;
+  // Recommended normalScale per type — higher values = more visible surface depth
+  let normalScale = 0.4;
+  if (type.startsWith('marble')) normalScale = 0.25;
+  else if (type.startsWith('wood')) normalScale = 0.55;
+  else if (type.startsWith('tile')) normalScale = 0.65;
+  else if (type === 'concrete_smooth') normalScale = 0.55;
+  else if (type === 'concrete_rough') normalScale = 0.75;
+  else if (type === 'concrete_epoxy') normalScale = 0.35;
+  else if (type.startsWith('stone')) normalScale = 0.65;
+  else if (type.startsWith('brick')) normalScale = 0.75;
+  else if (type === 'plaster') normalScale = 0.3;
 
   const result = { map, normalMap, roughness, normalScale };
   cache.set(type, result);
@@ -558,6 +618,7 @@ export const TEXTURE_TYPES = [
   'tile_square', 'tile_hex', 'tile_subway',
   'concrete_smooth', 'concrete_rough', 'concrete_epoxy',
   'stone_travertine', 'stone_slate',
+  'brick_red', 'brick_white', 'brick_dark',
   'plaster',
 ];
 
@@ -578,6 +639,9 @@ export const TEXTURE_NAMES = {
   concrete_epoxy: 'Epoxy Concrete',
   stone_travertine: 'Travertine',
   stone_slate: 'Slate',
+  brick_red: 'Red Brick',
+  brick_white: 'White Brick',
+  brick_dark: 'Dark Brick',
   plaster: 'Plaster',
 };
 
@@ -598,5 +662,8 @@ export const TEXTURE_SWATCH_COLORS = {
   concrete_epoxy: '#9A9590',
   stone_travertine: '#C3B49B',
   stone_slate: '#50555A',
+  brick_red: '#A04B37',
+  brick_white: '#DCD7CF',
+  brick_dark: '#554137',
   plaster: '#E8DDD0',
 };
